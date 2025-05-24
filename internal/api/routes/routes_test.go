@@ -226,20 +226,24 @@ func TestRequestIDMiddleware(t *testing.T) {
 	})
 }
 
-// Test generateRequestID
+// Test that generateRequestID produces valid IDs
 func TestGenerateRequestID(t *testing.T) {
-	// Generate multiple request IDs to ensure they're unique
+	// Pre-compile the regex for better performance
+	requestIDPattern := regexp.MustCompile(`^req_[a-f0-9]{8}$`)
+
 	requestIDs := make(map[string]bool)
+
+	// Generate multiple IDs to test uniqueness and format
 	for i := 0; i < 100; i++ {
 		id := generateRequestID()
+
+		// Basic format checks
 		assert.True(t, strings.HasPrefix(id, "req_"))
 		assert.False(t, requestIDs[id], "Request ID should be unique: %s", id)
 		requestIDs[id] = true
 
 		// Check format: req_ followed by 8 hex characters
-		matched, err := regexp.MatchString(`^req_[a-f0-9]{8}$`, id)
-		assert.NoError(t, err)
-		assert.True(t, matched, "Request ID format should be req_[8hexchars]: %s", id)
+		assert.True(t, requestIDPattern.MatchString(id), "Request ID format should be req_[8hexchars]: %s", id)
 	}
 }
 

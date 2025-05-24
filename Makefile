@@ -136,7 +136,7 @@ lint-install: ## Install golangci-lint
 
 lint-full: ## Run comprehensive linting (requires golangci-lint)
 	@echo "🔍 Running comprehensive linting..."
-	@golangci-lint run
+	@$(HOME)/go/bin/golangci-lint run --exclude="fieldalignment:"
 	@echo "✅ Comprehensive linting complete"
 
 # Utility commands

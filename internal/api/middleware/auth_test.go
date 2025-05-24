@@ -351,7 +351,8 @@ func TestAuthMiddlewareWithRequestBody(t *testing.T) {
 		"count": 42,
 	}
 
-	jsonData, _ := json.Marshal(testData)
+	jsonData, err := json.Marshal(testData)
+	require.NoError(t, err)
 
 	req := httptest.NewRequest("POST", "/test", bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
@@ -363,10 +364,11 @@ func TestAuthMiddlewareWithRequestBody(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 
-	received := response["received"].(map[string]interface{})
+	received, ok := response["received"].(map[string]interface{})
+	require.True(t, ok, "Expected received to be a map[string]interface{}")
 	assert.Equal(t, "data", received["test"])
 	assert.Equal(t, float64(42), received["count"]) // JSON unmarshals numbers as float64
 }

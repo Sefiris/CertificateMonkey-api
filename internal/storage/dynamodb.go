@@ -262,7 +262,12 @@ func (d *DynamoDBStorage) ListCertificateEntities(ctx context.Context, filters m
 
 	// Apply pagination
 	if filters.PageSize > 0 {
-		input.Limit = aws.Int32(int32(filters.PageSize))
+		// Ensure PageSize doesn't exceed int32 max value to prevent overflow
+		if filters.PageSize > 2147483647 {
+			input.Limit = aws.Int32(2147483647) // Max int32 value
+		} else {
+			input.Limit = aws.Int32(int32(filters.PageSize))
+		}
 	} else {
 		input.Limit = aws.Int32(50) // Default page size
 	}

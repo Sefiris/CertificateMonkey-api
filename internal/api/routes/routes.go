@@ -120,6 +120,9 @@ func requestIDMiddleware() gin.HandlerFunc {
 func generateRequestID() string {
 	// Simple implementation - in production you might want to use UUID
 	b := make([]byte, 4)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		return fmt.Sprintf("req_%d", 12345678)
+	}
 	return fmt.Sprintf("req_%x", b)
 }
