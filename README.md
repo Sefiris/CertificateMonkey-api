@@ -2,6 +2,11 @@
 
 A secure, scalable API for managing private keys, certificate signing requests (CSRs), and certificates with AWS DynamoDB storage and KMS encryption.
 
+## Disclaimer
+
+**This is my first public Go project and none of this should be ran in Production until it has been properly peer reviewed for security vulnerabilities.**
+**It is currently my way of gaining Go development experience**
+
 ## Features
 
 - **Private Key Generation**: Support for RSA (2048/4096) and ECDSA (P-256/P-384) key types
@@ -218,6 +223,30 @@ POST /api/v1/keys/{id}/pfx
 ```
 GET /api/v1/keys/{id}
 ```
+
+#### Export Private Key (SENSITIVE)
+```
+GET /api/v1/keys/{id}/private-key
+```
+
+**⚠️ Security Warning**: This endpoint exposes sensitive cryptographic material. Use with extreme caution and ensure proper access controls.
+
+**Response:**
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKB...\n-----END PRIVATE KEY-----",
+  "key_type": "RSA2048",
+  "common_name": "example.com",
+  "exported_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**Security Features:**
+- Comprehensive audit logging with client IP and User-Agent
+- Authentication required (API key or Bearer token)
+- Structured response with metadata
+- RFC3339 timestamp for export tracking
 
 #### List and Search Certificates
 ```

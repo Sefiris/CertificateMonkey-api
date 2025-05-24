@@ -1,0 +1,5 @@
+config:
+  aws:region: eu-central-1
+  aws:profile: sandbox-admin
+  certificate-monkey-infra:environment: dev
+  certificate-monkey-infra:table_name: certificate-monkey-dev

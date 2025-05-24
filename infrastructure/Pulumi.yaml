@@ -1,0 +1,6 @@
+name: dave-sandbox-certificate-monkey-infra
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: Infrastructure for Certificate Monkey API - DynamoDB and KMS resources
