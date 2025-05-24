@@ -15,11 +15,81 @@ config = pulumi.Config()
 environment = config.get("environment", "dev")
 table_name = config.get("table_name", f"certificate-monkey-{environment}")
 
+# Get current AWS account ID and region for the key policy
+current = aws.get_caller_identity()
+region = aws.get_region()
+
+# Create KMS key policy that allows console visibility
+kms_key_policy_document = aws.iam.get_policy_document(
+    statements=[
+        # Allow root user full access to the key (required)
+        aws.iam.GetPolicyDocumentStatementArgs(
+            sid="EnableRootAccess",
+            effect="Allow",
+            principals=[
+                aws.iam.GetPolicyDocumentStatementPrincipalArgs(
+                    type="AWS",
+                    identifiers=[pulumi.Output.concat("arn:aws:iam::", current.account_id, ":root")]
+                )
+            ],
+            actions=["kms:*"],
+            resources=["*"]
+        ),
+        # Allow all users in the account to describe the key and see aliases
+        aws.iam.GetPolicyDocumentStatementArgs(
+            sid="AllowConsoleAccess",
+            effect="Allow",
+            principals=[
+                aws.iam.GetPolicyDocumentStatementPrincipalArgs(
+                    type="AWS",
+                    identifiers=[pulumi.Output.concat("arn:aws:iam::", current.account_id, ":root")]
+                )
+            ],
+            actions=[
+                "kms:DescribeKey",
+                "kms:GetKeyPolicy",
+                "kms:GetKeyRotationStatus",
+                "kms:ListAliases",
+                "kms:ListGrants",
+                "kms:ListKeyPolicies"
+            ],
+            resources=["*"]
+        ),
+        # Allow DynamoDB service to use the key for encryption
+        aws.iam.GetPolicyDocumentStatementArgs(
+            sid="AllowDynamoDBAccess",
+            effect="Allow",
+            principals=[
+                aws.iam.GetPolicyDocumentStatementPrincipalArgs(
+                    type="Service",
+                    identifiers=["dynamodb.amazonaws.com"]
+                )
+            ],
+            actions=[
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+            ],
+            resources=["*"],
+            conditions=[
+                aws.iam.GetPolicyDocumentStatementConditionArgs(
+                    test="StringEquals",
+                    variable="kms:ViaService",
+                    values=[pulumi.Output.concat("dynamodb.", region.name, ".amazonaws.com")]
+                )
+            ]
+        )
+    ]
+)
+
 # Create KMS key for encrypting private keys
 kms_key = aws.kms.Key(
     "certificate-monkey-kms-key",
     description="Certificate Monkey private key encryption",
     deletion_window_in_days=7,  # Allow recovery if accidentally deleted
+    policy=kms_key_policy_document.json,
     tags={
         "Name": f"certificate-monkey-{environment}",
         "Environment": environment,
@@ -95,19 +165,20 @@ app_policy_document = aws.iam.get_policy_document(
                 pulumi.Output.concat(dynamodb_table.arn, "/index/*")
             ]
         ),
-        # KMS permissions
+        # KMS permissions for application use
         aws.iam.GetPolicyDocumentStatementArgs(
             effect="Allow",
             actions=[
                 "kms:Encrypt",
-                "kms:Decrypt"
+                "kms:Decrypt",
+                "kms:DescribeKey"
             ],
             resources=[kms_key.arn],
             conditions=[
                 aws.iam.GetPolicyDocumentStatementConditionArgs(
                     test="StringEquals",
                     variable="kms:ViaService",
-                    values=[pulumi.Output.concat("dynamodb.", aws.get_region().name, ".amazonaws.com")]
+                    values=[pulumi.Output.concat("dynamodb.", region.name, ".amazonaws.com")]
                 )
             ]
         )
@@ -139,5 +210,5 @@ pulumi.export("iam_policy_arn", app_policy.arn)
 pulumi.export("environment_variables", {
     "DYNAMODB_TABLE": dynamodb_table.name,
     "KMS_KEY_ID": kms_alias.name,
-    "AWS_REGION": aws.get_region().name
+    "AWS_REGION": region.name
 })
