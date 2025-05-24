@@ -703,7 +703,7 @@ Automatically runs on every pull request to ensure code quality:
 - **Linting**: Code quality checks with golangci-lint
 - **Security Scanning**: Vulnerability analysis with Gosec
 - **Docker Build Test**: Verifies container builds and runs correctly
-- **Coverage Enforcement**: Ensures minimum 80% test coverage
+- **Coverage Enforcement**: Ensures minimum 33% test coverage (target: 80% - see TODO.md)
 - **Multi-platform Support**: Tests Linux AMD64 and ARM64 builds
 
 ```yaml
@@ -874,7 +874,20 @@ AWS_REGION=us-east-1
 
 ## Future Enhancements
 
+📋 **See [TODO.md](TODO.md) for comprehensive roadmap and technical debt tracking**
+
+### Completed ✅
 - [x] Complete PFX generation implementation
+- [x] Semantic versioning system
+- [x] GitHub Actions CI/CD pipeline
+- [x] Docker containerization
+- [x] Security scanning integration
+
+### In Progress 🚧
+- [ ] Increase unit test coverage (current: 33.5%, target: 80%)
+- [ ] Enhanced error handling and logging
+
+### Planned 📅
 - [ ] Certificate template system
 - [ ] Certificate expiration monitoring
 - [ ] Audit logging
@@ -882,6 +895,8 @@ AWS_REGION=us-east-1
 - [ ] Webhook notifications
 - [ ] Certificate chain validation
 - [ ] Integration with external CAs
+
+For detailed implementation plans, priorities, and technical debt items, see [TODO.md](TODO.md).
 
 ## Contributing
 
