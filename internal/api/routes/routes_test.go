@@ -126,7 +126,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 	assert.Equal(t, "healthy", response["status"])
 	assert.Equal(t, "certificate-monkey", response["service"])
-	assert.Equal(t, "1.0.0", response["version"])
+	assert.Equal(t, "0.1.0", response["version"])
 }
 
 // Test CORS middleware

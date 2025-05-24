@@ -91,6 +91,23 @@ curl -H "Authorization: Bearer your_api_key_here" http://localhost:8080/api/v1/k
 GET /health
 ```
 
+#### Build Information
+```
+GET /build-info
+```
+
+Returns version and build information:
+```json
+{
+  "service": "certificate-monkey",
+  "version": "0.1.0",
+  "build_time": "2025-05-24_21:16:57_UTC",
+  "git_commit": "b739e97",
+  "go_version": "go1.24.3",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
 #### Create Private Key and CSR
 
 Creates a new private key and certificate signing request (CSR).
@@ -504,8 +521,11 @@ certificate-monkey/
 │   ├── config/           # Configuration management
 │   ├── crypto/           # Cryptographic operations
 │   ├── models/           # Data structures
-│   └── storage/          # DynamoDB operations
+│   ├── storage/          # DynamoDB operations
+│   └── version/          # Version management
 ├── Dockerfile            # Container configuration
+├── VERSION               # Current version number
+├── CHANGELOG.md          # Version history and changes
 └── README.md
 ```
 
@@ -587,6 +607,87 @@ go build -o certificate-monkey cmd/server/main.go
 # Build Docker image
 docker build -t certificate-monkey .
 ```
+
+## Versioning
+
+Certificate Monkey follows [Semantic Versioning (SemVer)](https://semver.org/) for releases.
+
+### Version Format
+
+```
+MAJOR.MINOR.PATCH
+```
+
+- **MAJOR**: Incompatible API changes
+- **MINOR**: Backwards-compatible functionality additions
+- **PATCH**: Backwards-compatible bug fixes
+
+### Current Version
+
+```bash
+# Check current version
+make version
+
+# Show project information
+make info
+```
+
+### Version Management
+
+```bash
+# Bump patch version (0.1.0 → 0.1.1)
+make version-patch
+
+# Bump minor version (0.1.0 → 0.2.0)
+make version-minor
+
+# Bump major version (0.1.0 → 1.0.0)
+make version-major
+```
+
+### Build Information
+
+The application embeds build information at compile time:
+
+```bash
+# Build with version information
+make build
+
+# Build release binary (optimized)
+make build-release
+
+# Check build info via API
+curl http://localhost:8080/build-info
+```
+
+### Release Process
+
+```bash
+# Prepare for release (tests, docs, validation)
+make release-prepare
+
+# The release process will guide you through:
+# 1. Update CHANGELOG.md with new version
+# 2. Commit changes
+# 3. Tag the release
+# 4. Push to repository
+```
+
+### Changelog
+
+All notable changes are documented in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/) format.
+
+The changelog includes:
+- **Added**: New features
+- **Changed**: Changes to existing functionality
+- **Deprecated**: Features that will be removed
+- **Removed**: Features that have been removed
+- **Fixed**: Bug fixes
+- **Security**: Security improvements
+
+### Pre-1.0 Development
+
+During the 0.x.x series, the API is considered unstable and may include breaking changes in minor versions. Once the API stabilizes, version 1.0.0 will be released with a commitment to backwards compatibility.
 
 ## Future Enhancements
 

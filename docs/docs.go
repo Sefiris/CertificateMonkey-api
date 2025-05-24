@@ -10,15 +10,14 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "https://github.com/your-org/certificate-monkey/blob/main/TERMS.md",
         "contact": {
             "name": "Certificate Monkey Support",
-            "url": "https://github.com/your-org/certificate-monkey",
-            "email": "support@certificate-monkey.com"
+            "url": "https://github.com/your-username/certificate-monkey",
+            "email": "support@certificatemonkey.dev"
         },
         "license": {
             "name": "MIT",
-            "url": "https://github.com/your-org/certificate-monkey/blob/main/LICENSE"
+            "url": "https://github.com/your-username/certificate-monkey/blob/main/LICENSE"
         },
         "version": "{{.Version}}"
     },
@@ -802,13 +801,13 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "ApiKeyAuth": {
-            "description": "API key for authentication. Can also be provided as Bearer token in Authorization header.",
+            "description": "API key for authentication. Use 'demo-api-key-12345' for testing.",
             "type": "apiKey",
             "name": "X-API-Key",
             "in": "header"
         },
         "BearerAuth": {
-            "description": "Bearer token authentication. Format: \"Bearer \u003capi-key\u003e\"",
+            "description": "Bearer token for authentication. Format: 'Bearer \u003cyour-api-key\u003e'",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -818,12 +817,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "0.1.0",
 	Host:             "localhost:8080",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Certificate Monkey API",
-	Description:      "A secure certificate management API for private keys, CSRs, and certificates",
+	Description:      "Secure certificate management API for private keys, CSRs, and certificates\n\nCertificate Monkey provides a complete solution for managing the certificate lifecycle:\n- Generate private keys (RSA 2048/4096, ECDSA P-256/P-384)\n- Create certificate signing requests (CSRs)\n- Upload and validate certificates\n- Generate PFX/PKCS#12 files for legacy applications\n- Export private keys (with comprehensive audit logging)\n\nAll private keys are encrypted with AWS KMS and stored in DynamoDB.\nThe API provides comprehensive search and filtering capabilities.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

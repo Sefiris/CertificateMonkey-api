@@ -210,16 +210,26 @@ definitions:
 host: localhost:8080
 info:
   contact:
-    email: support@certificate-monkey.com
+    email: support@certificatemonkey.dev
     name: Certificate Monkey Support
-    url: https://github.com/your-org/certificate-monkey
-  description: A secure certificate management API for private keys, CSRs, and certificates
+    url: https://github.com/your-username/certificate-monkey
+  description: |-
+    Secure certificate management API for private keys, CSRs, and certificates
+
+    Certificate Monkey provides a complete solution for managing the certificate lifecycle:
+    - Generate private keys (RSA 2048/4096, ECDSA P-256/P-384)
+    - Create certificate signing requests (CSRs)
+    - Upload and validate certificates
+    - Generate PFX/PKCS#12 files for legacy applications
+    - Export private keys (with comprehensive audit logging)
+
+    All private keys are encrypted with AWS KMS and stored in DynamoDB.
+    The API provides comprehensive search and filtering capabilities.
   license:
     name: MIT
-    url: https://github.com/your-org/certificate-monkey/blob/main/LICENSE
-  termsOfService: https://github.com/your-org/certificate-monkey/blob/main/TERMS.md
+    url: https://github.com/your-username/certificate-monkey/blob/main/LICENSE
   title: Certificate Monkey API
-  version: "1.0"
+  version: 0.1.0
 paths:
   /keys:
     get:
@@ -535,13 +545,12 @@ paths:
       - Certificate Management
 securityDefinitions:
   ApiKeyAuth:
-    description: API key for authentication. Can also be provided as Bearer token
-      in Authorization header.
+    description: API key for authentication. Use 'demo-api-key-12345' for testing.
     in: header
     name: X-API-Key
     type: apiKey
   BearerAuth:
-    description: 'Bearer token authentication. Format: "Bearer <api-key>"'
+    description: 'Bearer token for authentication. Format: ''Bearer <your-api-key>'''
     in: header
     name: Authorization
     type: apiKey

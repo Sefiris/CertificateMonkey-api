@@ -16,6 +16,7 @@ import (
 	"certificate-monkey/internal/config"
 	"certificate-monkey/internal/crypto"
 	"certificate-monkey/internal/storage"
+	"certificate-monkey/internal/version"
 )
 
 // SetupRoutes configures all API routes
@@ -46,7 +47,7 @@ func SetupRoutes(
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "healthy",
 			"service": "certificate-monkey",
-			"version": "1.0.0",
+			"version": version.GetVersion(),
 		})
 	})
 
