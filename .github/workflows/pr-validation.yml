@@ -205,3 +205,4 @@ jobs:
           echo "🎉 All checks passed! This PR is ready for review." >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ Some checks failed. Please review and fix the issues." >> $GITHUB_STEP_SUMMARY
+        fi
