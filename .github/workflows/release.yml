@@ -75,7 +75,11 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=Certificate Monkey
+          org.opencontainers.image.description=Certificate and Private Key Management API
+          org.opencontainers.image.vendor=Certificate Monkey
+          org.opencontainers.image.licenses=MIT
 
     - name: Get build information
       id: build-info
@@ -87,6 +91,7 @@ jobs:
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
+      id: build
       with:
         context: .
         platforms: linux/amd64,linux/arm64
@@ -101,29 +106,56 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    - name: Tag and push latest (main branch only)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # Get the first tag that was built and pushed
+        FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+        LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+
+        echo "Tagging $FIRST_TAG as $LATEST_TAG"
+        docker buildx imagetools create --tag "$LATEST_TAG" "$FIRST_TAG"
+        echo "✅ Latest tag created and pushed"
+
+    - name: Wait for image to be available
+      run: sleep 30
+
+    - name: Pull image for analysis
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "Pulling latest image for analysis..."
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
     - name: Generate SBOM
       uses: anchore/sbom-action@v0
+      if: github.ref == 'refs/heads/main'
       with:
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build-info.outputs.version }}
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
         format: spdx-json
         output-file: sbom.spdx.json
+      env:
+        SYFT_REGISTRY_AUTH_USERNAME: ${{ github.actor }}
+        SYFT_REGISTRY_AUTH_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        SYFT_REGISTRY_AUTH_AUTHORITY: ${{ env.REGISTRY }}
 
     - name: Upload SBOM
       uses: actions/upload-artifact@v4
+      if: github.ref == 'refs/heads/main'
       with:
         name: sbom
         path: sbom.spdx.json
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
+      if: github.ref == 'refs/heads/main'
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build-info.outputs.version }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
         format: 'sarif'
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       with:
         sarif_file: 'trivy-results.sarif'
 
