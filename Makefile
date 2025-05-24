@@ -165,6 +165,53 @@ docker-build: ## Build Docker image with version tags
 		-t certificate-monkey:$(CURRENT_VERSION) .
 	@echo "✅ Docker image built with tags: latest, $(CURRENT_VERSION)"
 
+docker-run: docker-build ## Build and run Docker container
+	@echo "🐳 Running Certificate Monkey container..."
+	@docker run -d --name certificate-monkey -p 8080:8080 \
+		-e API_KEY_1=demo-api-key-12345 \
+		-e DYNAMODB_TABLE=certificate-monkey-dev \
+		-e KMS_KEY_ID=alias/certificate-monkey-dev \
+		certificate-monkey:latest
+	@echo "✅ Container started on http://localhost:8080"
+	@echo "🏥 Health Check: http://localhost:8080/health"
+	@echo "📖 Swagger UI: http://localhost:8080/swagger/index.html"
+	@echo "📊 Build Info: http://localhost:8080/build-info"
+
+docker-stop: ## Stop and remove Docker container
+	@echo "🐳 Stopping Certificate Monkey container..."
+	@docker stop certificate-monkey || true
+	@docker rm certificate-monkey || true
+	@echo "✅ Container stopped and removed"
+
+docker-logs: ## View Docker container logs
+	@echo "📋 Certificate Monkey container logs:"
+	@docker logs certificate-monkey
+
+docker-test: docker-build ## Test Docker container health
+	@echo "🧪 Testing Docker container..."
+	@docker run -d --name certificate-monkey-test -p 8081:8080 \
+		-e API_KEY_1=test-key \
+		-e DYNAMODB_TABLE=test-table \
+		-e KMS_KEY_ID=test-key \
+		certificate-monkey:latest
+	@sleep 5
+	@if curl -f http://localhost:8081/health; then \
+		echo "✅ Container health check passed"; \
+	else \
+		echo "❌ Container health check failed"; \
+		docker logs certificate-monkey-test; \
+		exit 1; \
+	fi
+	@docker stop certificate-monkey-test
+	@docker rm certificate-monkey-test
+
+docker-clean: ## Clean up Docker images and containers
+	@echo "🧹 Cleaning Docker artifacts..."
+	@docker stop certificate-monkey certificate-monkey-test 2>/dev/null || true
+	@docker rm certificate-monkey certificate-monkey-test 2>/dev/null || true
+	@docker rmi certificate-monkey:latest certificate-monkey:$(CURRENT_VERSION) 2>/dev/null || true
+	@echo "✅ Docker cleanup complete"
+
 # Scripts
 demo: ## Run the complete demo
 	@echo "🎪 Starting Certificate Monkey demo..."

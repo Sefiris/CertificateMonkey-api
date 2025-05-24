@@ -689,6 +689,189 @@ The changelog includes:
 
 During the 0.x.x series, the API is considered unstable and may include breaking changes in minor versions. Once the API stabilizes, version 1.0.0 will be released with a commitment to backwards compatibility.
 
+## CI/CD Pipeline
+
+Certificate Monkey uses GitHub Actions for continuous integration and deployment with comprehensive automated workflows.
+
+### Workflows Overview
+
+#### 1. Pull Request Validation (`.github/workflows/pr-validation.yml`)
+
+Automatically runs on every pull request to ensure code quality:
+
+- **Testing**: Full test suite with race detection and coverage reporting
+- **Linting**: Code quality checks with golangci-lint
+- **Security Scanning**: Vulnerability analysis with Gosec
+- **Docker Build Test**: Verifies container builds and runs correctly
+- **Coverage Enforcement**: Ensures minimum 80% test coverage
+- **Multi-platform Support**: Tests Linux AMD64 and ARM64 builds
+
+```yaml
+# Triggered on:
+# - Pull requests to main/develop
+# - Pushes to develop branch
+```
+
+#### 2. Release Pipeline (`.github/workflows/release.yml`)
+
+Builds and publishes Docker containers on releases and main branch pushes:
+
+- **Automated Testing**: Validates all tests pass before deployment
+- **Docker Registry**: Publishes to GitHub Container Registry (ghcr.io)
+- **Multi-platform Images**: Builds for Linux AMD64 and ARM64
+- **Version Tagging**: Creates semantic version tags and latest tag
+- **Security Scanning**: Trivy vulnerability scanning and SBOM generation
+- **Release Creation**: Automated GitHub releases with changelog integration
+- **Staging Deployment**: Optional staging environment deployment
+
+```yaml
+# Triggered on:
+# - Pushes to main branch
+# - Git tags (v*)
+# - Published releases
+```
+
+#### 3. Security Analysis (`.github/workflows/codeql.yml`)
+
+Continuous security monitoring:
+
+- **CodeQL Analysis**: GitHub's semantic code analysis
+- **Scheduled Scans**: Weekly security scans
+- **Dependency Scanning**: Monitors for vulnerable dependencies
+- **Security Alerts**: Integration with GitHub Security tab
+
+```yaml
+# Triggered on:
+# - Pushes to main/develop
+# - Pull requests to main
+# - Weekly schedule (Mondays 2:30 AM UTC)
+```
+
+### Container Registry
+
+Docker images are published to GitHub Container Registry:
+
+```bash
+# Pull latest image
+docker pull ghcr.io/username/certificate-monkey:latest
+
+# Pull specific version
+docker pull ghcr.io/username/certificate-monkey:0.1.0
+
+# Available tags:
+# - latest (main branch)
+# - semver versions (v0.1.0, 0.1.0, 0.1)
+# - branch names (main, develop)
+# - commit SHAs (main-abc1234)
+```
+
+### Local Docker Commands
+
+```bash
+# Build Docker image locally
+make docker-build
+
+# Run container locally
+make docker-run
+
+# Test container health
+make docker-test
+
+# View container logs
+make docker-logs
+
+# Stop and cleanup
+make docker-stop
+make docker-clean
+```
+
+### Build Information
+
+All builds include embedded metadata:
+
+```bash
+# Check build information
+curl http://localhost:8080/build-info
+
+# Example response:
+{
+  "service": "certificate-monkey",
+  "version": "0.1.0",
+  "build_time": "2024-01-15_14:30:25_UTC",
+  "git_commit": "abc1234",
+  "go_version": "go1.22",
+  "timestamp": "2024-01-15T14:30:25Z"
+}
+```
+
+### Environment Variables for CI/CD
+
+Required for production deployments:
+
+```bash
+# Application configuration
+API_KEY_1=your-production-api-key
+DYNAMODB_TABLE=certificate-monkey-prod
+KMS_KEY_ID=alias/certificate-monkey-prod
+
+# Optional: AWS credentials (if not using IAM roles)
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=us-east-1
+```
+
+### Development Workflow
+
+1. **Feature Development**:
+   ```bash
+   git checkout -b feature/new-feature
+   # Make changes
+   git push origin feature/new-feature
+   # Create pull request
+   ```
+
+2. **PR Validation**: Automated checks run on pull request
+   - All tests must pass
+   - Linting must pass
+   - Docker build must succeed
+   - Coverage must be ≥80%
+
+3. **Merge to Main**: After PR approval
+   ```bash
+   git checkout main
+   git merge feature/new-feature
+   git push origin main
+   ```
+
+4. **Release Process**:
+   ```bash
+   # Update version and changelog
+   make version-minor
+   # Edit CHANGELOG.md
+   make release-prepare
+
+   # Create release
+   git add .
+   git commit -m "Release v0.2.0"
+   git tag v0.2.0
+   git push origin main --tags
+   ```
+
+5. **Automated Deployment**: GitHub Actions automatically:
+   - Builds and tests the release
+   - Creates Docker images
+   - Publishes to container registry
+   - Creates GitHub release with changelog
+   - Deploys to staging environment
+
+### Monitoring and Observability
+
+- **Health Checks**: Built-in container health checks
+- **Build Artifacts**: Coverage reports and SBOMs
+- **Security Reports**: Vulnerability scanning results
+- **Performance**: Multi-platform build optimization
+- **Dependency Tracking**: Automated dependency updates
+
 ## Future Enhancements
 
 - [x] Complete PFX generation implementation
