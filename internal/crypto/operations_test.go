@@ -510,8 +510,10 @@ func (suite *CryptoTestSuite) TestGeneratePFX() {
 // Test private key parsing with different formats
 func (suite *CryptoTestSuite) TestParsePrivateKeyFromPEM() {
 	// Generate test keys for each supported type
-	rsaKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	ecKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(suite.T(), err)
+	ecKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(suite.T(), err)
 
 	tests := []struct {
 		name        string
@@ -560,7 +562,7 @@ func (suite *CryptoTestSuite) TestParsePrivateKeyFromPEM() {
 	}
 
 	// Test invalid PEM
-	_, err := suite.cryptoService.parsePrivateKeyFromPEM("invalid")
+	_, err = suite.cryptoService.parsePrivateKeyFromPEM("invalid")
 	assert.Error(suite.T(), err)
 	assert.Contains(suite.T(), err.Error(), "failed to decode PEM block")
 
@@ -576,7 +578,8 @@ MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7
 // Helper function to create a test certificate
 func (suite *CryptoTestSuite) createTestCertificate() string {
 	// Generate a private key
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(suite.T(), err)
 
 	// Create certificate template
 	template := x509.Certificate{
@@ -592,7 +595,8 @@ func (suite *CryptoTestSuite) createTestCertificate() string {
 	}
 
 	// Create the certificate
-	certDER, _ := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	require.NoError(suite.T(), err)
 
 	// Encode to PEM
 	return string(pem.EncodeToMemory(&pem.Block{

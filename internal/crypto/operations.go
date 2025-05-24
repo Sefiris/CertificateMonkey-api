@@ -233,13 +233,8 @@ func (cs *CryptoService) GeneratePFX(privateKeyPEM, certificatePEM, password str
 	}
 
 	// Create PKCS#12 bundle
-	// The go-pkcs12 library expects:
-	// - rand: random source for generating the PKCS#12 file
-	// - privateKey: the parsed private key (interface{})
-	// - certificate: the parsed X.509 certificate
-	// - caCerts: slice of CA certificates (can be empty for end-entity certs)
-	// - password: the password to protect the PFX file
-	pfxData, err := pkcs12.Encode(rand.Reader, privateKey, cert, nil, password)
+	// Using Modern.Encode for better security instead of the deprecated Encode method
+	pfxData, err := pkcs12.Modern.Encode(privateKey, cert, nil, password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode PKCS#12: %w", err)
 	}
