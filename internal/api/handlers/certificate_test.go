@@ -29,13 +29,14 @@ func TestCertificateHandlerFields(t *testing.T) {
 	cryptoService := crypto.NewCryptoService()
 
 	handler := &CertificateHandler{
-		storage:       nil, // Can't easily mock DynamoDB storage
+		// Note: storage is intentionally not set here as it would be nil anyway
 		cryptoService: cryptoService,
 		logger:        logger,
 	}
 
 	assert.NotNil(t, handler.cryptoService)
 	assert.NotNil(t, handler.logger)
+	assert.Nil(t, handler.storage) // Explicitly test that storage is nil when not set
 }
 
 // TestCertificateHandlerType tests the struct type
