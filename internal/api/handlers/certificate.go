@@ -421,8 +421,8 @@ func (h *CertificateHandler) GetCertificate(c *gin.Context) {
 }
 
 // ListCertificates retrieves a list of certificates with optional filtering
-// @Summary List certificates with filtering
-// @Description Retrieves a paginated list of certificate entities with optional filtering by tags, status, key type, and date range
+// @Summary List certificates with filtering and sorting
+// @Description Retrieves a paginated list of certificate entities with optional filtering by tags, status, key type, date range, and sorting support
 // @Tags Certificate Management
 // @Accept json
 // @Produce json
@@ -434,6 +434,8 @@ func (h *CertificateHandler) GetCertificate(c *gin.Context) {
 // @Param date_to query string false "Filter certificates created before this date (RFC3339 format)"
 // @Param page query int false "Page number for pagination (default: 1)" minimum(1)
 // @Param page_size query int false "Number of items per page (default: 50, max: 100)" minimum(1) maximum(100)
+// @Param sort_by query string false "Sort by field (default: created_at)" Enums(created_at, updated_at, common_name, status, valid_to, valid_from, key_type)
+// @Param sort_order query string false "Sort order (default: desc)" Enums(asc, desc)
 // @Param environment query string false "Filter by environment tag"
 // @Param project query string false "Filter by project tag"
 // @Param team query string false "Filter by team tag"
@@ -481,10 +483,41 @@ func (h *CertificateHandler) ListCertificates(c *gin.Context) {
 		}
 	}
 
+	// Sorting parameters
+	if sortBy := c.Query("sort_by"); sortBy != "" {
+		// Validate sort field
+		validSortFields := []string{"created_at", "updated_at", "common_name", "status", "valid_to", "valid_from", "key_type"}
+		isValid := false
+		for _, validField := range validSortFields {
+			if sortBy == validField {
+				isValid = true
+				break
+			}
+		}
+		if isValid {
+			filters.SortBy = sortBy
+		}
+	}
+
+	if sortOrder := c.Query("sort_order"); sortOrder != "" {
+		// Validate sort order
+		if sortOrder == "asc" || sortOrder == "desc" {
+			filters.SortOrder = sortOrder
+		}
+	}
+
+	// Set defaults for sorting
+	if filters.SortBy == "" {
+		filters.SortBy = "created_at"
+	}
+	if filters.SortOrder == "" {
+		filters.SortOrder = "desc"
+	}
+
 	// Tag filters - expecting format: tag_key=tag_value
 	filters.Tags = make(map[string]string)
 	for key, values := range c.Request.URL.Query() {
-		if len(values) > 0 && key != "status" && key != "key_type" && key != "date_from" && key != "date_to" && key != "page" && key != "page_size" {
+		if len(values) > 0 && key != "status" && key != "key_type" && key != "date_from" && key != "date_to" && key != "page" && key != "page_size" && key != "sort_by" && key != "sort_order" {
 			filters.Tags[key] = values[0]
 		}
 	}
@@ -500,6 +533,14 @@ func (h *CertificateHandler) ListCertificates(c *gin.Context) {
 		return
 	}
 
+	// Get total count before pagination (we need to call storage method that returns total count)
+	totalCount, err := h.storage.GetCertificateEntityCount(c.Request.Context(), filters)
+	if err != nil {
+		h.logger.WithError(err).Error("Failed to get certificate entity count")
+		// Continue with current count as fallback
+		totalCount = len(entities)
+	}
+
 	// Remove sensitive data from response
 	for i := range entities {
 		entities[i].EncryptedPrivateKey = "[REDACTED]"
@@ -508,9 +549,11 @@ func (h *CertificateHandler) ListCertificates(c *gin.Context) {
 	// Prepare response
 	response := models.ListKeysResponse{
 		Keys:       entities,
-		TotalCount: len(entities),
+		TotalCount: totalCount,
 		Page:       filters.Page,
 		PageSize:   filters.PageSize,
+		SortBy:     filters.SortBy,
+		SortOrder:  filters.SortOrder,
 	}
 
 	h.logger.WithFields(logrus.Fields{

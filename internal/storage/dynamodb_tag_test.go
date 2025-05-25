@@ -114,16 +114,43 @@ func TestTagFilteringFormat(t *testing.T) {
 	assert.True(t, exists, "#tags must be defined in expressionAttributeNames")
 	assert.Equal(t, "tags", expressionAttributeNames["#tags"], "#tags should map to 'tags'")
 
-	// Verify tag key mappings
-	assert.Equal(t, "environment", expressionAttributeNames["#tag_key_0"])
-	assert.Equal(t, "project", expressionAttributeNames["#tag_key_1"])
+	// Verify we have the correct number of tag key and value mappings
+	assert.Equal(t, 2, len(filterExpressions), "Should have 2 filter expressions")
+	assert.Equal(t, 3, len(expressionAttributeNames), "Should have 3 attribute names: #tags + 2 tag keys")
+	assert.Equal(t, 2, len(expressionAttributeValues), "Should have 2 attribute values")
 
-	// Verify tag value mappings
-	envValue, exists := expressionAttributeValues[":tag_value_0"]
-	assert.True(t, exists, ":tag_value_0 should exist")
-	envStr, ok := envValue.(*types.AttributeValueMemberS)
-	assert.True(t, ok, ":tag_value_0 should be a string")
-	assert.Equal(t, "production", envStr.Value)
+	// Verify tag key mappings exist (order-independent)
+	foundEnvironment := false
+	foundProject := false
+	for key, value := range expressionAttributeNames {
+		if key == "#tags" {
+			continue // Skip the #tags mapping
+		}
+		if value == "environment" {
+			foundEnvironment = true
+		}
+		if value == "project" {
+			foundProject = true
+		}
+	}
+	assert.True(t, foundEnvironment, "Should have environment tag key mapping")
+	assert.True(t, foundProject, "Should have project tag key mapping")
+
+	// Verify tag value mappings exist (order-independent)
+	foundProductionValue := false
+	foundWebServerValue := false
+	for _, value := range expressionAttributeValues {
+		if strValue, ok := value.(*types.AttributeValueMemberS); ok {
+			if strValue.Value == "production" {
+				foundProductionValue = true
+			}
+			if strValue.Value == "web-server" {
+				foundWebServerValue = true
+			}
+		}
+	}
+	assert.True(t, foundProductionValue, "Should have production tag value")
+	assert.True(t, foundWebServerValue, "Should have web-server tag value")
 }
 
 // TestIncorrectTagStorageDetection helps identify if tags are being stored incorrectly
