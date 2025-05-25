@@ -126,15 +126,19 @@ type ListKeysResponse struct {
 	TotalCount int                 `json:"total_count"`
 	Page       int                 `json:"page"`
 	PageSize   int                 `json:"page_size"`
+	SortBy     string              `json:"sort_by,omitempty"`
+	SortOrder  string              `json:"sort_order,omitempty"`
 }
 
 // SearchFilters represents filters for searching certificates
 type SearchFilters struct {
-	Tags     map[string]string `form:"tags"`
-	Status   CertificateStatus `form:"status"`
-	KeyType  KeyType           `form:"key_type"`
-	DateFrom *time.Time        `form:"date_from"`
-	DateTo   *time.Time        `form:"date_to"`
-	Page     int               `form:"page"`
-	PageSize int               `form:"page_size"`
+	Tags      map[string]string `form:"tags"`
+	Status    CertificateStatus `form:"status"`
+	KeyType   KeyType           `form:"key_type"`
+	DateFrom  *time.Time        `form:"date_from"`
+	DateTo    *time.Time        `form:"date_to"`
+	Page      int               `form:"page"`
+	PageSize  int               `form:"page_size"`
+	SortBy    string            `form:"sort_by"`
+	SortOrder string            `form:"sort_order"`
 }

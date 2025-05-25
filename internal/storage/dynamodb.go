@@ -260,18 +260,8 @@ func (d *DynamoDBStorage) ListCertificateEntities(ctx context.Context, filters m
 		input.ExpressionAttributeValues = expressionAttributeValues
 	}
 
-	// Apply pagination
-	if filters.PageSize > 0 {
-		// Ensure PageSize doesn't exceed int32 max value to prevent overflow
-		if filters.PageSize > 2147483647 {
-			input.Limit = aws.Int32(2147483647) // Max int32 value
-		} else {
-			input.Limit = aws.Int32(int32(filters.PageSize))
-		}
-	} else {
-		input.Limit = aws.Int32(50) // Default page size
-	}
-
+	// Note: We'll retrieve all matching items first, then sort and paginate in memory
+	// This is because DynamoDB Scan doesn't support sorting by arbitrary fields
 	result, err := d.client.Scan(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan DynamoDB table: %w", err)
@@ -300,7 +290,224 @@ func (d *DynamoDBStorage) ListCertificateEntities(ctx context.Context, filters m
 		entities = append(entities, entity)
 	}
 
-	return entities, nil
+	// Apply sorting
+	d.sortEntities(entities, filters.SortBy, filters.SortOrder)
+
+	// Apply pagination after sorting
+	totalCount := len(entities)
+	page := filters.Page
+	pageSize := filters.PageSize
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+
+	startIndex := (page - 1) * pageSize
+	endIndex := startIndex + pageSize
+
+	if startIndex >= totalCount {
+		return []models.CertificateEntity{}, nil
+	}
+
+	if endIndex > totalCount {
+		endIndex = totalCount
+	}
+
+	return entities[startIndex:endIndex], nil
+}
+
+// GetCertificateEntityCount returns the total count of entities matching the filters
+func (d *DynamoDBStorage) GetCertificateEntityCount(ctx context.Context, filters models.SearchFilters) (int, error) {
+	input := &dynamodb.ScanInput{
+		TableName: aws.String(d.tableName),
+		Select:    types.SelectCount, // Only count, don't return items
+	}
+
+	// Apply the same filters as in ListCertificateEntities
+	var filterExpressions []string
+	expressionAttributeNames := make(map[string]string)
+	expressionAttributeValues := make(map[string]types.AttributeValue)
+
+	if filters.Status != "" {
+		filterExpressions = append(filterExpressions, "#status = :status")
+		expressionAttributeNames["#status"] = "status"
+		expressionAttributeValues[":status"] = &types.AttributeValueMemberS{Value: string(filters.Status)}
+	}
+
+	if filters.KeyType != "" {
+		filterExpressions = append(filterExpressions, "#key_type = :key_type")
+		expressionAttributeNames["#key_type"] = "key_type"
+		expressionAttributeValues[":key_type"] = &types.AttributeValueMemberS{Value: string(filters.KeyType)}
+	}
+
+	if filters.DateFrom != nil {
+		filterExpressions = append(filterExpressions, "#created_at >= :date_from")
+		expressionAttributeNames["#created_at"] = "created_at"
+		expressionAttributeValues[":date_from"] = &types.AttributeValueMemberS{Value: filters.DateFrom.Format(time.RFC3339)}
+	}
+
+	if filters.DateTo != nil {
+		filterExpressions = append(filterExpressions, "#created_at <= :date_to")
+		expressionAttributeNames["#created_at"] = "created_at"
+		expressionAttributeValues[":date_to"] = &types.AttributeValueMemberS{Value: filters.DateTo.Format(time.RFC3339)}
+	}
+
+	// Add tag filters
+	if len(filters.Tags) > 0 {
+		expressionAttributeNames["#tags"] = "tags"
+	}
+
+	tagIndex := 0
+	for tagKey, tagValue := range filters.Tags {
+		filterExpressions = append(filterExpressions, fmt.Sprintf("#tags.#tag_key_%d = :tag_value_%d", tagIndex, tagIndex))
+		expressionAttributeNames[fmt.Sprintf("#tag_key_%d", tagIndex)] = tagKey
+		expressionAttributeValues[fmt.Sprintf(":tag_value_%d", tagIndex)] = &types.AttributeValueMemberS{Value: tagValue}
+		tagIndex++
+	}
+
+	if len(filterExpressions) > 0 {
+		filterExpression := ""
+		for i, expr := range filterExpressions {
+			if i > 0 {
+				filterExpression += " AND "
+			}
+			filterExpression += expr
+		}
+		input.FilterExpression = aws.String(filterExpression)
+		input.ExpressionAttributeNames = expressionAttributeNames
+		input.ExpressionAttributeValues = expressionAttributeValues
+	}
+
+	result, err := d.client.Scan(ctx, input)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count items in DynamoDB table: %w", err)
+	}
+
+	return int(result.Count), nil
+}
+
+// sortEntities sorts the entities slice in-place based on the specified field and order
+func (d *DynamoDBStorage) sortEntities(entities []models.CertificateEntity, sortBy, sortOrder string) {
+	if len(entities) <= 1 {
+		return
+	}
+
+	// Import sort package at the top of the file
+	// sort.Slice(entities, func(i, j int) bool {
+	// 	return d.compareEntities(entities[i], entities[j], sortBy, sortOrder)
+	// })
+
+	// Implement sorting using a simple approach
+	for i := 0; i < len(entities)-1; i++ {
+		for j := i + 1; j < len(entities); j++ {
+			shouldSwap := d.compareEntities(entities[i], entities[j], sortBy, sortOrder)
+			if shouldSwap {
+				entities[i], entities[j] = entities[j], entities[i]
+			}
+		}
+	}
+}
+
+// compareEntities compares two entities based on the sort field and order
+// Returns true if entity i should come after entity j in the sorted order
+func (d *DynamoDBStorage) compareEntities(entityI, entityJ models.CertificateEntity, sortBy, sortOrder string) bool {
+	var comparison int
+
+	switch sortBy {
+	case "created_at":
+		if entityI.CreatedAt.Before(entityJ.CreatedAt) {
+			comparison = -1
+		} else if entityI.CreatedAt.After(entityJ.CreatedAt) {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	case "updated_at":
+		if entityI.UpdatedAt.Before(entityJ.UpdatedAt) {
+			comparison = -1
+		} else if entityI.UpdatedAt.After(entityJ.UpdatedAt) {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	case "common_name":
+		if entityI.CommonName < entityJ.CommonName {
+			comparison = -1
+		} else if entityI.CommonName > entityJ.CommonName {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	case "status":
+		statusI := string(entityI.Status)
+		statusJ := string(entityJ.Status)
+		if statusI < statusJ {
+			comparison = -1
+		} else if statusI > statusJ {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	case "key_type":
+		keyTypeI := string(entityI.KeyType)
+		keyTypeJ := string(entityJ.KeyType)
+		if keyTypeI < keyTypeJ {
+			comparison = -1
+		} else if keyTypeI > keyTypeJ {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	case "valid_to":
+		// Handle nil values
+		if entityI.ValidTo == nil && entityJ.ValidTo == nil {
+			comparison = 0
+		} else if entityI.ValidTo == nil {
+			comparison = -1 // nil comes first
+		} else if entityJ.ValidTo == nil {
+			comparison = 1
+		} else if entityI.ValidTo.Before(*entityJ.ValidTo) {
+			comparison = -1
+		} else if entityI.ValidTo.After(*entityJ.ValidTo) {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	case "valid_from":
+		// Handle nil values
+		if entityI.ValidFrom == nil && entityJ.ValidFrom == nil {
+			comparison = 0
+		} else if entityI.ValidFrom == nil {
+			comparison = -1 // nil comes first
+		} else if entityJ.ValidFrom == nil {
+			comparison = 1
+		} else if entityI.ValidFrom.Before(*entityJ.ValidFrom) {
+			comparison = -1
+		} else if entityI.ValidFrom.After(*entityJ.ValidFrom) {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	default:
+		// Default to created_at sorting
+		if entityI.CreatedAt.Before(entityJ.CreatedAt) {
+			comparison = -1
+		} else if entityI.CreatedAt.After(entityJ.CreatedAt) {
+			comparison = 1
+		} else {
+			comparison = 0
+		}
+	}
+
+	// Apply sort order
+	if sortOrder == "desc" {
+		comparison = -comparison
+	}
+
+	return comparison > 0
 }
 
 // DeleteCertificateEntity deletes a certificate entity by ID

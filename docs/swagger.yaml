@@ -180,6 +180,10 @@ definitions:
         type: integer
       page_size:
         type: integer
+      sort_by:
+        type: string
+      sort_order:
+        type: string
       total_count:
         type: integer
     type: object
@@ -236,7 +240,7 @@ paths:
       consumes:
       - application/json
       description: Retrieves a paginated list of certificate entities with optional
-        filtering by tags, status, key type, and date range
+        filtering by tags, status, key type, date range, and sorting support
       parameters:
       - description: Filter by certificate status
         enum:
@@ -275,6 +279,25 @@ paths:
         minimum: 1
         name: page_size
         type: integer
+      - description: 'Sort by field (default: created_at)'
+        enum:
+        - created_at
+        - updated_at
+        - common_name
+        - status
+        - valid_to
+        - valid_from
+        - key_type
+        in: query
+        name: sort_by
+        type: string
+      - description: 'Sort order (default: desc)'
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort_order
+        type: string
       - description: Filter by environment tag
         in: query
         name: environment
@@ -307,7 +330,7 @@ paths:
       security:
       - ApiKeyAuth: []
       - BearerAuth: []
-      summary: List certificates with filtering
+      summary: List certificates with filtering and sorting
       tags:
       - Certificate Management
     post:

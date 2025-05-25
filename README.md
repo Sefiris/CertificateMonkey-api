@@ -279,6 +279,45 @@ GET /api/v1/keys?status=CERT_UPLOADED&key_type=RSA2048&environment=production
 - `page_size`: Number of results per page (max 100)
 - Any tag key: Filter by tag value (e.g., `environment=production`)
 
+#### List Keys with Filtering and Sorting
+
+The API supports various filtering and sorting options:
+
+```bash
+# List all keys sorted by creation date (newest first) - default
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8080/api/v1/keys"
+
+# Sort by common name (alphabetical)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8080/api/v1/keys?sort_by=common_name&sort_order=asc"
+
+# Sort by expiration date (descending)
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8080/api/v1/keys?sort_by=valid_to&sort_order=desc"
+
+# Sort by status with filtering
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8080/api/v1/keys?status=CERT_UPLOADED&sort_by=status&sort_order=asc"
+
+# Combined filtering and sorting with pagination
+curl -H "X-API-Key: your-api-key" \
+  "http://localhost:8080/api/v1/keys?key_type=RSA2048&sort_by=updated_at&sort_order=desc&page=1&page_size=10"
+```
+
+**Supported sort fields:**
+- `created_at` (default)
+- `updated_at`
+- `common_name`
+- `status`
+- `valid_to`
+- `valid_from`
+- `key_type`
+
+**Sort orders:**
+- `desc` (default) - Descending order
+- `asc` - Ascending order
+
 ## API Documentation
 
 ### Swagger UI

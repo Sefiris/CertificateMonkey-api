@@ -34,7 +34,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a paginated list of certificate entities with optional filtering by tags, status, key type, and date range",
+                "description": "Retrieves a paginated list of certificate entities with optional filtering by tags, status, key type, date range, and sorting support",
                 "consumes": [
                     "application/json"
                 ],
@@ -44,7 +44,7 @@ const docTemplate = `{
                 "tags": [
                     "Certificate Management"
                 ],
-                "summary": "List certificates with filtering",
+                "summary": "List certificates with filtering and sorting",
                 "parameters": [
                     {
                         "enum": [
@@ -95,6 +95,31 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Number of items per page (default: 50, max: 100)",
                         "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "created_at",
+                            "updated_at",
+                            "common_name",
+                            "status",
+                            "valid_to",
+                            "valid_from",
+                            "key_type"
+                        ],
+                        "type": "string",
+                        "description": "Sort by field (default: created_at)",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "description": "Sort order (default: desc)",
+                        "name": "sort_order",
                         "in": "query"
                     },
                     {
@@ -755,6 +780,12 @@ const docTemplate = `{
                 },
                 "page_size": {
                     "type": "integer"
+                },
+                "sort_by": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "string"
                 },
                 "total_count": {
                     "type": "integer"
