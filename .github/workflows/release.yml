@@ -53,6 +53,10 @@ jobs:
       with:
         fetch-depth: 0  # Fetch full history for git info
 
+    - name: Set lowercase image name
+      run: |
+        echo "IMAGE_NAME_LOWER=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -111,7 +115,7 @@ jobs:
       run: |
         # Get the first tag that was built and pushed
         FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
-        LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest"
 
         echo "Tagging $FIRST_TAG as $LATEST_TAG"
         docker buildx imagetools create --tag "$LATEST_TAG" "$FIRST_TAG"
@@ -124,13 +128,13 @@ jobs:
       if: github.ref == 'refs/heads/main'
       run: |
         echo "Pulling latest image for analysis..."
-        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
 
     - name: Generate SBOM
       uses: anchore/sbom-action@v0
       if: github.ref == 'refs/heads/main'
       with:
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
         format: spdx-json
         output-file: sbom.spdx.json
       env:
@@ -149,7 +153,7 @@ jobs:
       uses: aquasecurity/trivy-action@master
       if: github.ref == 'refs/heads/main'
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
         format: 'sarif'
         output: 'trivy-results.sarif'
 
@@ -219,10 +223,10 @@ jobs:
     - name: Deploy to staging
       run: |
         echo "🚀 Deploying to staging environment..."
-        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest"
         echo "This is where you would integrate with your deployment system"
         # Example: kubectl, helm, or other deployment tools
-        # kubectl set image deployment/certificate-monkey certificate-monkey=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        # kubectl set image deployment/certificate-monkey certificate-monkey=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
 
   notify:
     name: Notify
@@ -235,7 +239,7 @@ jobs:
       if: needs.build-and-push.result == 'success'
       run: |
         echo "✅ Successfully built and pushed Docker image"
-        echo "🐳 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        echo "🐳 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}"
 
         if [[ "${{ needs.create-release.result }}" == "success" ]]; then
           echo "🏷️ Created GitHub release"
