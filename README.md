@@ -786,6 +786,19 @@ Continuous security monitoring:
 # - Weekly schedule (Mondays 2:30 AM UTC)
 ```
 
+**Security Permissions**: All workflows that upload security scan results (SARIF files) to GitHub's Security tab require the `security-events: write` permission. This enables:
+
+- **Trivy Vulnerability Scanning**: Container image vulnerability analysis uploaded to Security tab
+- **Gosec Code Analysis**: Go security linting results uploaded to Security tab
+- **CodeQL Analysis**: GitHub's semantic code analysis for vulnerability detection
+
+**Supported Security Scanners**:
+- **CodeQL**: GitHub's native security analysis (codeql.yml workflow)
+- **Trivy**: Container vulnerability scanning (release.yml workflow)
+- **Gosec**: Go-specific security linting (pr-validation.yml workflow)
+
+All security scan results are automatically uploaded to the repository's Security tab for centralized vulnerability management and tracking.
+
 ### Container Registry
 
 Docker images are published to GitHub Container Registry:
