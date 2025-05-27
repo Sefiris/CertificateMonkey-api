@@ -232,7 +232,7 @@ info:
   license:
     name: MIT
     url: https://github.com/your-username/certificate-monkey/blob/main/LICENSE
-  title: Certificate Monkey API
+  title: "\U0001F412 Certificate Monkey API"
   version: 0.1.0
 paths:
   /keys:
