@@ -60,6 +60,12 @@ jobs:
           echo "Checking commit: $commit"
           echo "Message: $MESSAGE"
 
+          # Skip merge commits (they don't need to follow conventional commits)
+          if echo "$MESSAGE" | grep -qE "^Merge "; then
+            echo "  -> Skipping merge commit"
+            continue
+          fi
+
           if ! echo "$MESSAGE" | grep -qE "$PATTERN"; then
             INVALID_COMMITS+=("$commit: $MESSAGE")
           fi
