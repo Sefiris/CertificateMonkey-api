@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"certificate-monkey/docs"
-	_ "certificate-monkey/docs" // Import generated docs
 	"certificate-monkey/internal/api/routes"
 	appConfig "certificate-monkey/internal/config"
 	"certificate-monkey/internal/crypto"
@@ -24,7 +23,7 @@ import (
 	"certificate-monkey/internal/version"
 )
 
-// @title Certificate Monkey API
+// @title 🐒 Certificate Monkey API
 // @description Secure certificate management API for private keys, CSRs, and certificates
 // @description
 // @description Certificate Monkey provides a complete solution for managing the certificate lifecycle:
@@ -71,7 +70,7 @@ func main() {
 	logger.WithFields(logrus.Fields{
 		"version":    version.GetVersion(),
 		"build_info": version.Get(),
-	}).Info("Starting Certificate Monkey API")
+	}).Info("Starting 🐒 Certificate Monkey API")
 
 	// Initialize AWS configuration
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(),

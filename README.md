@@ -649,7 +649,20 @@ docker build -t certificate-monkey .
 
 ## Versioning
 
-Certificate Monkey follows [Semantic Versioning (SemVer)](https://semver.org/) for releases.
+Certificate Monkey uses **Conventional Commits** and **Semantic Versioning (SemVer)** with automated release management.
+
+### Versioning Strategy
+
+We use a **hybrid approach** that combines:
+
+- ✅ **[Conventional Commits](https://www.conventionalcommits.org/)** for structured commit messages
+- ✅ **[Semantic Versioning](https://semver.org/)** for predictable version numbers
+- ✅ **Automated version calculation** based on commit analysis
+- ✅ **Human oversight** for release timing and quality
+- ✅ **Automated changelog generation** from commit history
+
+📖 **[Complete Versioning Guide](docs/VERSIONING.md)** - Detailed documentation with examples
+🚀 **[Helm Integration Guide](docs/HELM_INTEGRATION.md)** - Docker image tags and future Helm chart strategy
 
 ### Version Format
 
@@ -657,32 +670,82 @@ Certificate Monkey follows [Semantic Versioning (SemVer)](https://semver.org/) f
 MAJOR.MINOR.PATCH
 ```
 
-- **MAJOR**: Incompatible API changes
-- **MINOR**: Backwards-compatible functionality additions
-- **PATCH**: Backwards-compatible bug fixes
+- **MAJOR**: Breaking changes (e.g., API redesign)
+- **MINOR**: New features (backwards-compatible)
+- **PATCH**: Bug fixes (backwards-compatible)
+
+### Commit Message Format
+
+All commits must follow the Conventional Commits specification:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Examples:**
+```bash
+feat: add certificate expiration notifications
+fix: resolve SSL handshake timeout issue
+docs: update API documentation
+feat!: redesign API endpoints (breaking change)
+```
+
+**Quick Reference:**
+```bash
+# Show commit format help
+make commit-help
+```
+
+### Version Management Commands
+
+```bash
+# Preview next version based on commits
+make version-preview
+
+# Automatically bump version based on commits
+make version-bump-auto
+
+# Manual version bumps
+make version-bump-patch    # 0.1.0 → 0.1.1
+make version-bump-minor    # 0.1.0 → 0.2.0
+make version-bump-major    # 0.1.0 → 1.0.0
+
+# Complete automated release
+make release-auto
+```
 
 ### Current Version
 
 ```bash
-# Check current version
+# Check current version and build info
 make version
 
-# Show project information
+# Show detailed project information
 make info
 ```
 
-### Version Management
+### Automated Release Process
 
-```bash
-# Bump patch version (0.1.0 → 0.1.1)
-make version-patch
+When commits are pushed to `main`:
 
-# Bump minor version (0.1.0 → 0.2.0)
-make version-minor
+1. **Analyzes commits** since last release
+2. **Calculates next version** automatically
+3. **Creates releases** for `feat` and `fix` commits
+4. **Generates changelogs** from commit messages
+5. **Creates GitHub releases** with detailed notes
 
-# Bump major version (0.1.0 → 1.0.0)
-make version-major
-```
+### Pull Request Validation
+
+Every PR automatically:
+
+- ✅ **Validates commit messages** against conventional format
+- ✅ **Previews version impact** (major/minor/patch/none)
+- ✅ **Comments on PR** with version information
+- ✅ **Runs comprehensive tests** and quality checks
 
 ### Build Information
 
@@ -699,30 +762,37 @@ make build-release
 curl http://localhost:8080/build-info
 ```
 
-### Release Process
+### Docker Image Tags
 
-```bash
-# Prepare for release (tests, docs, validation)
-make release-prepare
+Every release creates multiple Docker image tags for flexible deployment:
 
-# The release process will guide you through:
-# 1. Update CHANGELOG.md with new version
-# 2. Commit changes
-# 3. Tag the release
-# 4. Push to repository
-```
+- **Patch-pinned**: `0.1.0`, `v0.1.0` - Recommended for production
+- **Minor-tracking**: `0.1`, `v0.1` - Auto-receive patch updates
+- **Major-tracking**: `0`, `v0` - Auto-receive feature updates
+- **Latest**: `latest` - Always the newest main branch build
+- **Immutable**: `main-abc1234` - SHA-based tags for compliance
+
+See [Helm Integration Guide](docs/HELM_INTEGRATION.md) for deployment strategies and future Helm chart support.
 
 ### Changelog
 
-All notable changes are documented in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/) format.
+All changes are automatically documented in [CHANGELOG.md](CHANGELOG.md) following the [Keep a Changelog](https://keepachangelog.com/) format.
 
 The changelog includes:
-- **Added**: New features
-- **Changed**: Changes to existing functionality
-- **Deprecated**: Features that will be removed
-- **Removed**: Features that have been removed
-- **Fixed**: Bug fixes
-- **Security**: Security improvements
+- **💥 Breaking Changes**: API changes requiring updates
+- **✨ Features**: New functionality
+- **🐛 Bug Fixes**: Issue resolutions
+- **📚 Documentation**: Documentation updates
+- **🔧 Maintenance**: Internal improvements
+
+### Migration from Manual Versioning
+
+For contributors familiar with manual versioning:
+
+1. **Start using conventional commits** for all new changes
+2. **Let automation handle** version calculation and releases
+3. **Review PR comments** to understand version impact
+4. **Use manual overrides** when needed (`make version-bump-major`)
 
 ### Pre-1.0 Development
 
@@ -812,10 +882,12 @@ docker pull ghcr.io/username/certificate-monkey:0.1.0
 
 # Available tags:
 # - latest (main branch)
-# - semver versions (v0.1.0, 0.1.0, 0.1)
+# - semver versions (v0.1.0, 0.1.0, 0.1, v0.1, 0, v0)
 # - branch names (main, develop)
 # - commit SHAs (main-abc1234)
 ```
+
+**Helm-ready images:** All images include OCI labels and metadata for Helm chart compatibility. See [Helm Integration Guide](docs/HELM_INTEGRATION.md) for deployment strategies.
 
 ### Local Docker Commands
 
