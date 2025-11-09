@@ -183,7 +183,7 @@ jobs:
           type=semver,pattern=v{{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=semver,pattern=v{{major}}
-          type=sha,prefix={{branch}}-
+          type=sha
         labels: |
           org.opencontainers.image.title=Certificate Monkey
           org.opencontainers.image.description=Certificate and Private Key Management API
