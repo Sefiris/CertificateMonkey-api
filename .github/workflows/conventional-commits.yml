@@ -58,21 +58,25 @@ jobs:
 
         INVALID_COMMITS=()
 
-        for commit in $COMMITS; do
-          MESSAGE=$(git log --format=%s -n 1 $commit)
-          echo "Checking commit: $commit"
-          echo "Message: $MESSAGE"
+        while IFS= read -r commit; do
+          # Properly quote commit variable and limit message length
+          MESSAGE=$(git log --format=%s -n 1 "$commit" | head -c 200)
+
+          # Use printf instead of echo to avoid escape sequence interpretation
+          printf "Checking commit: %s\n" "$commit"
+          printf "Message: %s\n" "$MESSAGE"
 
           # Skip merge commits (they don't need to follow conventional commits)
-          if echo "$MESSAGE" | grep -qE "^Merge "; then
-            echo "  -> Skipping merge commit"
+          if printf "%s" "$MESSAGE" | grep -qE "^Merge "; then
+            printf "  -> Skipping merge commit\n"
             continue
           fi
 
-          if ! echo "$MESSAGE" | grep -qE "$PATTERN"; then
-            INVALID_COMMITS+=("$commit: $MESSAGE")
+          if ! printf "%s" "$MESSAGE" | grep -qE "$PATTERN"; then
+            # Store safely with proper quoting
+            INVALID_COMMITS+=("$(printf "%s: %s" "$commit" "$MESSAGE")")
           fi
-        done
+        done < <(echo "$COMMITS")
 
         if [ ${#INVALID_COMMITS[@]} -gt 0 ]; then
           echo "❌ Found invalid commit messages:"
@@ -109,19 +113,20 @@ jobs:
         HAS_FEAT=false
         HAS_FIX=false
 
-        for commit in $COMMITS; do
-          MESSAGE=$(git log --format=%s -n 1 $commit)
-          BODY=$(git log --format=%b -n 1 $commit)
+        while IFS= read -r commit; do
+          # Properly quote commit variable and limit message/body length
+          MESSAGE=$(git log --format=%s -n 1 "$commit" | head -c 200)
+          BODY=$(git log --format=%b -n 1 "$commit" | head -c 1000)
 
-          # Check for breaking changes
-          if echo "$MESSAGE" | grep -q "!:" || echo "$BODY" | grep -q "BREAKING CHANGE"; then
+          # Check for breaking changes using printf for safety
+          if printf "%s" "$MESSAGE" | grep -q "!:" || printf "%s" "$BODY" | grep -q "BREAKING CHANGE"; then
             HAS_BREAKING=true
-          elif echo "$MESSAGE" | grep -q "^feat"; then
+          elif printf "%s" "$MESSAGE" | grep -q "^feat"; then
             HAS_FEAT=true
-          elif echo "$MESSAGE" | grep -q "^fix"; then
+          elif printf "%s" "$MESSAGE" | grep -q "^fix"; then
             HAS_FIX=true
           fi
-        done
+        done < <(echo "$COMMITS")
 
         # Calculate next version
         IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
@@ -148,11 +153,24 @@ jobs:
 
     - name: Comment PR with Version Preview
       uses: actions/github-script@v7
+      env:
+        NEXT_VERSION: ${{ steps.preview.outputs.next_version }}
+        BUMP_TYPE: ${{ steps.preview.outputs.bump_type }}
+        CURRENT_VERSION: ${{ steps.preview.outputs.current_version }}
       with:
         script: |
-          const nextVersion = '${{ steps.preview.outputs.next_version }}';
-          const bumpType = '${{ steps.preview.outputs.bump_type }}';
-          const currentVersion = '${{ steps.preview.outputs.current_version }}';
+          // Use environment variables to avoid injection
+          const nextVersion = process.env.NEXT_VERSION;
+          const bumpType = process.env.BUMP_TYPE;
+          const currentVersion = process.env.CURRENT_VERSION;
+
+          // Validate inputs (defense in depth)
+          if (!/^\d+\.\d+\.\d+$/.test(nextVersion) || !/^\d+\.\d+\.\d+$/.test(currentVersion)) {
+            throw new Error('Invalid version format');
+          }
+          if (!['major', 'minor', 'patch', 'none'].includes(bumpType)) {
+            throw new Error('Invalid bump type');
+          }
 
           let emoji = '📦';
           if (bumpType === 'major') emoji = '💥';
