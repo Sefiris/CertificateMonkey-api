@@ -1,0 +1,195 @@
+name: Conventional Commits
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  conventional-commits:
+    name: Validate Conventional Commits
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Validate PR Title
+      uses: amannn/action-semantic-pull-request@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        types: |
+          feat
+          fix
+          docs
+          style
+          refactor
+          perf
+          test
+          build
+          ci
+          chore
+          revert
+        requireScope: false
+        disallowScopes: |
+          release
+        subjectPattern: ^(?![A-Z]).+$
+        subjectPatternError: |
+          The subject "{subject}" found in the pull request title "{title}"
+          didn't match the configured pattern. Please ensure that the subject
+          doesn't start with an uppercase character.
+
+    - name: Validate Commit Messages
+      run: |
+        echo "🔍 Validating commit messages..."
+
+        # Get all commits in this PR
+        git fetch origin main
+        COMMITS=$(git rev-list --reverse origin/main..HEAD)
+
+        # Conventional commit pattern
+        PATTERN="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,50}"
+
+        INVALID_COMMITS=()
+
+        for commit in $COMMITS; do
+          MESSAGE=$(git log --format=%s -n 1 $commit)
+          echo "Checking commit: $commit"
+          echo "Message: $MESSAGE"
+
+          if ! echo "$MESSAGE" | grep -qE "$PATTERN"; then
+            INVALID_COMMITS+=("$commit: $MESSAGE")
+          fi
+        done
+
+        if [ ${#INVALID_COMMITS[@]} -gt 0 ]; then
+          echo "❌ Found invalid commit messages:"
+          printf '%s\n' "${INVALID_COMMITS[@]}"
+          echo ""
+          echo "ℹ️  Commit messages should follow the Conventional Commits specification:"
+          echo "   <type>[optional scope]: <description>"
+          echo ""
+          echo "   Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+          echo "   Examples:"
+          echo "   - feat: add user authentication"
+          echo "   - fix: resolve memory leak in data processing"
+          echo "   - docs: update API documentation"
+          echo "   - refactor: simplify certificate validation logic"
+          exit 1
+        else
+          echo "✅ All commit messages follow conventional commits format"
+        fi
+
+    - name: Preview Next Version
+      id: preview
+      run: |
+        echo "🔮 Previewing next version based on commits..."
+
+        CURRENT_VERSION=$(cat VERSION)
+        echo "Current version: $CURRENT_VERSION"
+
+        # Get all commits in this PR
+        git fetch origin main
+        COMMITS=$(git rev-list --reverse origin/main..HEAD)
+
+        # Analyze commit types
+        HAS_BREAKING=false
+        HAS_FEAT=false
+        HAS_FIX=false
+
+        for commit in $COMMITS; do
+          MESSAGE=$(git log --format=%s -n 1 $commit)
+          BODY=$(git log --format=%b -n 1 $commit)
+
+          # Check for breaking changes
+          if echo "$MESSAGE" | grep -q "!:" || echo "$BODY" | grep -q "BREAKING CHANGE"; then
+            HAS_BREAKING=true
+          elif echo "$MESSAGE" | grep -q "^feat"; then
+            HAS_FEAT=true
+          elif echo "$MESSAGE" | grep -q "^fix"; then
+            HAS_FIX=true
+          fi
+        done
+
+        # Calculate next version
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+        if [ "$HAS_BREAKING" = true ]; then
+          NEXT_VERSION="$((MAJOR + 1)).0.0"
+          BUMP_TYPE="major"
+        elif [ "$HAS_FEAT" = true ]; then
+          NEXT_VERSION="$MAJOR.$((MINOR + 1)).0"
+          BUMP_TYPE="minor"
+        elif [ "$HAS_FIX" = true ]; then
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          BUMP_TYPE="patch"
+        else
+          NEXT_VERSION="$CURRENT_VERSION"
+          BUMP_TYPE="none"
+        fi
+
+        echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+        echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+        echo "Next version would be: $NEXT_VERSION (${BUMP_TYPE} bump)"
+
+    - name: Comment PR with Version Preview
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const nextVersion = '${{ steps.preview.outputs.next_version }}';
+          const bumpType = '${{ steps.preview.outputs.bump_type }}';
+          const currentVersion = '${{ steps.preview.outputs.current_version }}';
+
+          let emoji = '📦';
+          if (bumpType === 'major') emoji = '💥';
+          else if (bumpType === 'minor') emoji = '✨';
+          else if (bumpType === 'patch') emoji = '🐛';
+          else if (bumpType === 'none') emoji = '📝';
+
+          const body = `## ${emoji} Version Preview
+
+          **Current Version:** \`${currentVersion}\`
+          **Next Version:** \`${nextVersion}\` (\`${bumpType}\` bump)
+
+          ${bumpType === 'major' ? '⚠️ **Breaking Change Detected** - This will trigger a major version bump!' : ''}
+          ${bumpType === 'minor' ? '🎉 **New Feature** - This will trigger a minor version bump!' : ''}
+          ${bumpType === 'patch' ? '🔧 **Bug Fix** - This will trigger a patch version bump!' : ''}
+          ${bumpType === 'none' ? '📚 **Documentation/Chores** - No version bump needed!' : ''}
+
+          ---
+          *This preview is based on conventional commit analysis. The actual version will be determined when the release is created.*`;
+
+          // Find existing comment
+          const comments = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const existingComment = comments.data.find(comment =>
+            comment.user.login === 'github-actions[bot]' &&
+            comment.body.includes('Version Preview')
+          );
+
+          if (existingComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existingComment.id,
+              body: body
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }

@@ -16,7 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"certificate-monkey/docs"
-	_ "certificate-monkey/docs" // Import generated docs
 	"certificate-monkey/internal/api/routes"
 	appConfig "certificate-monkey/internal/config"
 	"certificate-monkey/internal/crypto"

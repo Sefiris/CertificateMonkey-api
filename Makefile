@@ -21,41 +21,56 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Version management commands
-version: ## Show current version
+version: ## Show current version information
+	@echo "📋 Certificate Monkey Version Information"
+	@echo "========================================"
 	@echo "Current version: $(CURRENT_VERSION)"
 	@echo "Build time: $(BUILD_TIME)"
 	@echo "Git commit: $(GIT_COMMIT)"
 	@echo "Go version: $(GO_VERSION)"
+	@echo ""
+	@echo "🔍 For detailed version analysis, run: make version-preview"
+	@echo "🐳 For Docker/Helm tags, run: make version-docker-tags"
 
-version-patch: ## Bump patch version (0.1.0 -> 0.1.1)
-	@echo "Bumping patch version..."
-	@current=$$(cat VERSION); \
-	new_version=$$(echo $$current | awk -F. '{$$3=$$3+1; print $$1"."$$2"."$$3}'); \
-	echo $$new_version > VERSION; \
-	echo "Version bumped from $$current to $$new_version"
+version-preview: ## Preview next version based on conventional commits
+	@./scripts/version-manager.sh preview
 
-version-minor: ## Bump minor version (0.1.0 -> 0.2.0)
-	@echo "Bumping minor version..."
-	@current=$$(cat VERSION); \
-	new_version=$$(echo $$current | awk -F. '{$$2=$$2+1; $$3=0; print $$1"."$$2"."$$3}'); \
-	echo $$new_version > VERSION; \
-	echo "Version bumped from $$current to $$new_version"
+version-bump-auto: ## Automatically bump version based on conventional commits
+	@./scripts/version-manager.sh bump auto
 
-version-major: ## Bump major version (0.1.0 -> 1.0.0)
-	@echo "Bumping major version..."
-	@current=$$(cat VERSION); \
-	new_version=$$(echo $$current | awk -F. '{$$1=$$1+1; $$2=0; $$3=0; print $$1"."$$2"."$$3}'); \
-	echo $$new_version > VERSION; \
-	echo "Version bumped from $$current to $$new_version"
+version-bump-patch: ## Bump patch version (0.1.0 -> 0.1.1)
+	@./scripts/version-manager.sh bump patch
 
-changelog-prepare: ## Prepare changelog for new release
-	@echo "Preparing CHANGELOG.md for version $(CURRENT_VERSION)..."
+version-bump-minor: ## Bump minor version (0.1.0 -> 0.2.0)
+	@./scripts/version-manager.sh bump minor
+
+version-bump-major: ## Bump major version (0.1.0 -> 1.0.0)
+	@./scripts/version-manager.sh bump major
+
+version-tag: ## Create git tag for current version
+	@./scripts/version-manager.sh tag
+
+version-release: ## Complete release process (bump + commit + tag)
+	@./scripts/version-manager.sh release
+
+version-docker-tags: ## Preview Docker/Helm tags for current version
+	@./scripts/version-manager.sh docker-tags
+
+# Legacy version commands (deprecated but maintained for compatibility)
+version-patch: version-bump-patch ## [DEPRECATED] Use version-bump-patch instead
+
+version-minor: version-bump-minor ## [DEPRECATED] Use version-bump-minor instead
+
+version-major: version-bump-major ## [DEPRECATED] Use version-bump-major instead
+
+changelog-prepare: ## Validate changelog is ready for current version
+	@echo "📝 Validating CHANGELOG.md for version $(CURRENT_VERSION)..."
 	@if ! grep -q "## \[$(CURRENT_VERSION)\]" CHANGELOG.md; then \
-		echo "Version $(CURRENT_VERSION) not found in CHANGELOG.md"; \
-		echo "Please add an entry for this version in CHANGELOG.md"; \
+		echo "❌ Version $(CURRENT_VERSION) not found in CHANGELOG.md"; \
+		echo "💡 Run 'make version-bump-auto' to automatically update changelog"; \
 		exit 1; \
 	fi
-	@echo "CHANGELOG.md is ready for version $(CURRENT_VERSION)"
+	@echo "✅ CHANGELOG.md is ready for version $(CURRENT_VERSION)"
 
 # Build commands
 build: ## Build the application with version information
@@ -145,6 +160,7 @@ clean: ## Clean build artifacts and temporary files
 	@rm -f certificate-monkey certificate-monkey-linux
 	@rm -f coverage.out coverage.html
 	@rm -rf docs/docs.go docs/swagger.json docs/swagger.yaml
+	@rm -f CHANGELOG.md.backup
 	@echo "✅ Cleanup complete"
 
 deps: ## Download and tidy dependencies
@@ -212,6 +228,34 @@ docker-clean: ## Clean up Docker images and containers
 	@docker rmi certificate-monkey:latest certificate-monkey:$(CURRENT_VERSION) 2>/dev/null || true
 	@echo "✅ Docker cleanup complete"
 
+# Helm commands (future implementation)
+# When Helm charts are created, uncomment and customize these commands:
+#
+# helm-lint: ## Lint Helm chart
+# 	@echo "🔍 Linting Helm chart..."
+# 	@helm lint helm/certificate-monkey
+#
+# helm-package: ## Package Helm chart with current version
+# 	@echo "📦 Packaging Helm chart..."
+# 	@sed -i.bak "s/^appVersion:.*$$/appVersion: \"$(CURRENT_VERSION)\"/" helm/certificate-monkey/Chart.yaml
+# 	@helm package helm/certificate-monkey
+# 	@rm -f helm/certificate-monkey/Chart.yaml.bak
+#
+# helm-install: ## Install chart locally for testing
+# 	@echo "🚀 Installing Helm chart..."
+# 	@helm install certificate-monkey-test ./helm/certificate-monkey \
+# 		--set image.tag=$(CURRENT_VERSION) \
+# 		--set apiKeys.primary=test-key
+#
+# helm-test: ## Run Helm chart tests
+# 	@echo "🧪 Testing Helm chart..."
+# 	@helm test certificate-monkey-test
+#
+# helm-uninstall: ## Uninstall test chart
+# 	@helm uninstall certificate-monkey-test
+#
+# See docs/HELM_INTEGRATION.md for complete Helm integration guide
+
 # Scripts
 demo: ## Run the complete demo
 	@echo "🎪 Starting Certificate Monkey demo..."
@@ -230,16 +274,61 @@ test-private-key: ## Test private key export functionality
 	@./scripts/test-private-key-export.sh
 
 # Release management
-release-prepare: version changelog-prepare swagger-gen test ## Prepare for release (run tests, generate docs)
-	@echo "🚀 Preparing release v$(CURRENT_VERSION)..."
-	@echo "✅ All checks passed - ready for release!"
+release-prepare: version-preview swagger-gen test lint-full ## Prepare for release (run tests, generate docs, preview version)
 	@echo ""
-	@echo "Next steps:"
-	@echo "1. Review CHANGELOG.md"
-	@echo "2. git add ."
-	@echo "3. git commit -m 'Release v$(CURRENT_VERSION)'"
-	@echo "4. git tag v$(CURRENT_VERSION)"
-	@echo "5. git push origin main --tags"
+	@echo "🚀 Release Preparation Complete"
+	@echo "==============================="
+	@echo "✅ Version analysis completed"
+	@echo "✅ Tests passed"
+	@echo "✅ Linting passed"
+	@echo "✅ Documentation generated"
+	@echo ""
+	@echo "💡 Next steps:"
+	@echo "1. Review version preview above"
+	@echo "2. Run 'make version-bump-auto' to bump version and update changelog"
+	@echo "3. Review and commit changes"
+	@echo "4. Run 'make version-tag' to create git tag"
+	@echo "5. Push with 'git push origin main --tags'"
+
+release-auto: ## Automated release process with conventional commits
+	@echo "🚀 Starting automated release process..."
+	@make test
+	@make lint-full
+	@make swagger-gen
+	@./scripts/version-manager.sh release
+	@echo ""
+	@echo "🎉 Release completed! Don't forget to push:"
+	@echo "   git push origin main --tags"
+
+# Conventional commits helpers
+commit-help: ## Show conventional commit format help
+	@echo "📝 Conventional Commit Format"
+	@echo "============================"
+	@echo ""
+	@echo "Format: <type>[optional scope]: <description>"
+	@echo ""
+	@echo "Types:"
+	@echo "  feat:     ✨ A new feature (minor version bump)"
+	@echo "  fix:      🐛 A bug fix (patch version bump)"
+	@echo "  docs:     📚 Documentation only changes"
+	@echo "  style:    💄 Code style changes (formatting, etc.)"
+	@echo "  refactor: ♻️  Code refactoring"
+	@echo "  perf:     ⚡ Performance improvements"
+	@echo "  test:     🧪 Adding or updating tests"
+	@echo "  build:    🔧 Build system or dependencies"
+	@echo "  ci:       👷 CI/CD changes"
+	@echo "  chore:    🔨 Other changes (maintenance, etc.)"
+	@echo "  revert:   ⏪ Reverting previous changes"
+	@echo ""
+	@echo "Breaking changes:"
+	@echo "  Add '!' after type: feat!: breaking change"
+	@echo "  Or add 'BREAKING CHANGE:' in commit body"
+	@echo ""
+	@echo "Examples:"
+	@echo "  feat: add user authentication system"
+	@echo "  fix: resolve memory leak in certificate processing"
+	@echo "  docs: update API documentation with new endpoints"
+	@echo "  feat!: redesign API endpoints (breaking change)"
 
 # Information
 info: ## Show project information
@@ -268,3 +357,9 @@ info: ## Show project information
 	@echo "🔑 Demo API Keys:"
 	@echo "  demo-api-key-12345"
 	@echo "  swagger-test-key"
+	@echo ""
+	@echo "📝 Version Management:"
+	@echo "  make version-preview     - Preview next version"
+	@echo "  make version-bump-auto   - Auto-bump based on commits"
+	@echo "  make commit-help         - Show commit format help"
+	@echo "  make release-auto        - Complete automated release"
