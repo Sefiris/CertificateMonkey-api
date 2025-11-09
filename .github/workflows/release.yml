@@ -39,106 +39,8 @@ jobs:
     - name: Run tests
       run: go test -v -race ./...
 
-  version-check:
-    name: Version Analysis
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    outputs:
-      should_release: ${{ steps.version.outputs.should_release }}
-      next_version: ${{ steps.version.outputs.next_version }}
-      bump_type: ${{ steps.version.outputs.bump_type }}
-      current_version: ${{ steps.version.outputs.current_version }}
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Analyze Version
-      id: version
-      run: |
-        chmod +x scripts/version-manager.sh
-
-        CURRENT_VERSION=$(cat VERSION)
-        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        echo "Last tag: $LAST_TAG"
-
-        if [ -z "$LAST_TAG" ]; then
-          COMMITS=$(git rev-list --reverse HEAD)
-        else
-          COMMITS=$(git rev-list --reverse "${LAST_TAG}..HEAD" 2>/dev/null || git rev-list --reverse HEAD)
-        fi
-
-        if [ -z "$COMMITS" ]; then
-          echo "No new commits since last tag"
-          echo "should_release=false" >> $GITHUB_OUTPUT
-          echo "next_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "bump_type=none" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        HAS_BREAKING=false
-        HAS_FEAT=false
-        HAS_FIX=false
-
-        for commit in $COMMITS; do
-          MESSAGE=$(git log --format=%s -n 1 "$commit")
-          BODY=$(git log --format=%b -n 1 "$commit")
-
-          echo "Analyzing commit: $MESSAGE"
-
-          if echo "$MESSAGE" | grep -q "!:" || echo "$BODY" | grep -q "BREAKING CHANGE"; then
-            HAS_BREAKING=true
-            echo "  -> Breaking change detected"
-          elif echo "$MESSAGE" | grep -q "^feat"; then
-            HAS_FEAT=true
-            echo "  -> Feature detected"
-          elif echo "$MESSAGE" | grep -q "^fix"; then
-            HAS_FIX=true
-            echo "  -> Fix detected"
-          fi
-        done
-
-        if [ "$HAS_BREAKING" = true ]; then
-          BUMP_TYPE="major"
-        elif [ "$HAS_FEAT" = true ]; then
-          BUMP_TYPE="minor"
-        elif [ "$HAS_FIX" = true ]; then
-          BUMP_TYPE="patch"
-        else
-          BUMP_TYPE="none"
-        fi
-
-        echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-
-        if [ "$BUMP_TYPE" != "none" ]; then
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-
-          case "$BUMP_TYPE" in
-            major)
-              NEXT_VERSION="$((MAJOR + 1)).0.0"
-              ;;
-            minor)
-              NEXT_VERSION="$MAJOR.$((MINOR + 1)).0"
-              ;;
-            patch)
-              NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-              ;;
-          esac
-
-          echo "should_release=true" >> $GITHUB_OUTPUT
-          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
-
-          echo "🚀 Release recommended: $CURRENT_VERSION -> $NEXT_VERSION ($BUMP_TYPE)"
-        else
-          echo "should_release=false" >> $GITHUB_OUTPUT
-          echo "next_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-          echo "📝 No release needed (documentation/chore changes only)"
-        fi
+  # Version check disabled - using manual tag-based releases due to branch protection
+  # To create a release: make version-bump-auto && git commit && git tag v0.x.0 && git push origin v0.x.0
 
   build-and-push:
     name: Build and Push Docker Image
@@ -265,139 +167,13 @@ jobs:
       with:
         sarif_file: 'trivy-results.sarif'
 
-  auto-release:
-    name: Auto Release
-    runs-on: ubuntu-latest
-    needs: [test, version-check, build-and-push]
-    if: needs.version-check.outputs.should_release == 'true' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Configure Git
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-
-    - name: Create Release
-      run: |
-        chmod +x scripts/version-manager.sh
-
-        echo "🚀 Creating automated release..."
-        echo "Current version: ${{ needs.version-check.outputs.current_version }}"
-        echo "Next version: ${{ needs.version-check.outputs.next_version }}"
-        echo "Bump type: ${{ needs.version-check.outputs.bump_type }}"
-
-        echo "${{ needs.version-check.outputs.next_version }}" > VERSION
-
-        ./scripts/version-manager.sh bump ${{ needs.version-check.outputs.bump_type }}
-
-        git add VERSION CHANGELOG.md
-        git commit -m "chore: release v${{ needs.version-check.outputs.next_version }}"
-
-        git tag -a "v${{ needs.version-check.outputs.next_version }}" -m "Release v${{ needs.version-check.outputs.next_version }}"
-
-        git push origin main
-        git push origin "v${{ needs.version-check.outputs.next_version }}"
-
-    - name: Download SBOM artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: sbom
-        path: ./artifacts
-
-    - name: Generate Release Notes
-      run: |
-        VERSION="${{ needs.version-check.outputs.next_version }}"
-        BUMP_TYPE="${{ needs.version-check.outputs.bump_type }}"
-        IMAGE_NAME_LOWER=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')
-
-        # Start release notes
-        cat > release_notes.md << EOF
-        # Release v${VERSION}
-
-        EOF
-
-        # Add version bump indicator
-        case "$BUMP_TYPE" in
-          major)
-            echo "## 💥 Major Release" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "This release contains **breaking changes**. Please review the changelog carefully before upgrading." >> release_notes.md
-            echo "" >> release_notes.md
-            ;;
-          minor)
-            echo "## ✨ Minor Release" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "This release adds new features while maintaining backward compatibility." >> release_notes.md
-            echo "" >> release_notes.md
-            ;;
-          patch)
-            echo "## 🐛 Patch Release" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "This release contains bug fixes and improvements." >> release_notes.md
-            echo "" >> release_notes.md
-            ;;
-        esac
-
-        # Extract changelog content
-        if grep -q "## \[${VERSION}\]" CHANGELOG.md; then
-          echo "## What's Changed" >> release_notes.md
-          echo "" >> release_notes.md
-          sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | sed '$d' | tail -n +2 >> release_notes.md
-          echo "" >> release_notes.md
-        else
-          echo "## What's Changed" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "This release was automatically generated based on conventional commits." >> release_notes.md
-          echo "" >> release_notes.md
-        fi
-
-        # Add Docker image information
-        echo "## 🐳 Docker Images" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "Multi-platform container images are available from GitHub Container Registry:" >> release_notes.md
-        echo "" >> release_notes.md
-        echo '```bash' >> release_notes.md
-        echo "# Pull latest release" >> release_notes.md
-        echo "docker pull ghcr.io/${IMAGE_NAME_LOWER}:${VERSION}" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "# Pull with v prefix" >> release_notes.md
-        echo "docker pull ghcr.io/${IMAGE_NAME_LOWER}:v${VERSION}" >> release_notes.md
-        echo '```' >> release_notes.md
-        echo "" >> release_notes.md
-        echo "**Supported Architectures:** linux/amd64, linux/arm64" >> release_notes.md
-        echo "" >> release_notes.md
-
-        # Add security information
-        echo "## 🔒 Security" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "- SBOM (Software Bill of Materials) included as release asset" >> release_notes.md
-        echo "- Container images scanned with Trivy for vulnerabilities" >> release_notes.md
-        echo "- Security scan results available in the [Security tab](https://github.com/${{ github.repository }}/security)" >> release_notes.md
-        echo "" >> release_notes.md
-
-        # Add footer
-        echo "---" >> release_notes.md
-        echo "" >> release_notes.md
-        echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ needs.version-check.outputs.current_version }}...v${VERSION}" >> release_notes.md
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ needs.version-check.outputs.next_version }}
-        name: Release v${{ needs.version-check.outputs.next_version }}
-        body_path: release_notes.md
-        draft: false
-        prerelease: false
-        files: |
-          ./artifacts/sbom.spdx.json
+  # Auto-release disabled due to branch protection rules
+  # Use manual tag-based releases instead:
+  #   1. make version-bump-auto (or version-bump-patch/minor/major)
+  #   2. git add VERSION CHANGELOG.md && git commit -m "chore: release vX.Y.Z"
+  #   3. git tag vX.Y.Z
+  #   4. git push origin main --tags
+  # The manual-release job below will trigger on the tag push
 
   manual-release:
     name: Manual Release
@@ -506,7 +282,7 @@ jobs:
   notify:
     name: Notify
     runs-on: ubuntu-latest
-    needs: [build-and-push, auto-release, manual-release, deploy-staging]
+    needs: [build-and-push, manual-release, deploy-staging]
     if: always()
 
     steps:
@@ -515,10 +291,6 @@ jobs:
       run: |
         echo "✅ Successfully built and pushed Docker image"
         echo "🐳 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}"
-
-        if [[ "${{ needs.auto-release.result }}" == "success" ]]; then
-          echo "🏷️ Created GitHub release"
-        fi
 
         if [[ "${{ needs.manual-release.result }}" == "success" ]]; then
           echo "🏷️ Created GitHub release"
