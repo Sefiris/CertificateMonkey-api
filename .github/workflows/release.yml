@@ -8,7 +8,7 @@ on:
     types: [ published ]
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.25'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -19,10 +19,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ env.GO_VERSION }}
 
@@ -53,7 +53,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
 
@@ -101,7 +101,7 @@ jobs:
           org.opencontainers.image.licenses=MIT
           org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/README.md
           org.opencontainers.image.authors=Certificate Monkey Contributors
-          org.opencontainers.image.base.name=golang:1.24-alpine
+          org.opencontainers.image.base.name=golang:1.25-alpine
           io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository }}/main/README.md
           io.artifacthub.package.license=MIT
           io.artifacthub.package.keywords=certificate,pki,tls,ssl,kms,security
@@ -193,7 +193,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Get version
       id: version
