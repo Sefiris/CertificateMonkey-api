@@ -44,10 +44,10 @@ type AWSHealthResponse struct {
 
 // HealthCheck represents individual service check result
 type HealthCheck struct {
-	Status      string  `json:"status"`
-	Message     string  `json:"message,omitempty"`
-	ResponseMs  int64   `json:"response_ms"`
-	Error       string  `json:"error,omitempty"`
+	Status     string `json:"status"`
+	Message    string `json:"message,omitempty"`
+	ResponseMs int64  `json:"response_ms"`
+	Error      string `json:"error,omitempty"`
 }
 
 // BasicHealth returns basic health status

@@ -154,12 +154,12 @@ func TestHealthCheckMethodSignatures(t *testing.T) {
 	assert.NotNil(t, storage)
 	assert.Equal(t, "test-table", storage.tableName)
 	assert.Equal(t, "test-key", storage.kmsKeyID)
-	
+
 	// Verify health check methods exist by checking they can be referenced
 	// We don't call them because they require real AWS clients
 	var dynamoHealthCheck func(context.Context) error = storage.CheckDynamoDBHealth
 	var kmsHealthCheck func(context.Context) error = storage.CheckKMSHealth
-	
+
 	assert.NotNil(t, dynamoHealthCheck)
 	assert.NotNil(t, kmsHealthCheck)
 }

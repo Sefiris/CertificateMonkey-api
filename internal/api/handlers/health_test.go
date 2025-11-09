@@ -89,10 +89,10 @@ func TestAWSHealthEndpointExists(t *testing.T) {
 	logger.SetOutput(nil)
 
 	handler := NewHealthHandler(storage, logger)
-	
+
 	// Verify the AWSHealth method exists and is callable
 	assert.NotNil(t, handler.AWSHealth)
-	
+
 	// Verify the handler has the required components
 	assert.NotNil(t, handler.storage)
 	assert.NotNil(t, handler.logger)
@@ -110,4 +110,3 @@ func TestHandlerLoggerIsUsed(t *testing.T) {
 	assert.Same(t, logger, handler.logger, "Handler should use the provided logger")
 	assert.Same(t, storage, handler.storage, "Handler should use the provided storage")
 }
-
