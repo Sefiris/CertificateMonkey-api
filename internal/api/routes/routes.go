@@ -16,7 +16,6 @@ import (
 	"certificate-monkey/internal/config"
 	"certificate-monkey/internal/crypto"
 	"certificate-monkey/internal/storage"
-	"certificate-monkey/internal/version"
 )
 
 // SetupRoutes configures all API routes
@@ -42,14 +41,12 @@ func SetupRoutes(
 	router.Use(corsMiddleware())
 	router.Use(requestIDMiddleware())
 
-	// Health check endpoint (no auth required)
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "healthy",
-			"service": "certificate-monkey",
-			"version": version.GetVersion(),
-		})
-	})
+	// Create health handler
+	healthHandler := handlers.NewHealthHandler(storage, logger)
+
+	// Health check endpoints (no auth required)
+	router.GET("/health", healthHandler.BasicHealth)
+	router.GET("/health/aws", healthHandler.AWSHealth)
 
 	// Swagger documentation endpoint (no authentication required)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
