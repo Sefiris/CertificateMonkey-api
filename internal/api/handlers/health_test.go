@@ -38,14 +38,15 @@ func TestBasicHealth(t *testing.T) {
 	router := gin.New()
 	router.GET("/health", handler.BasicHealth)
 
-	req, _ := http.NewRequest("GET", "/health", nil)
+	req, err := http.NewRequest("GET", "/health", nil)
+	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "healthy", response["status"])
@@ -64,14 +65,15 @@ func TestBasicHealthResponseStructure(t *testing.T) {
 	router := gin.New()
 	router.GET("/health", handler.BasicHealth)
 
-	req, _ := http.NewRequest("GET", "/health", nil)
+	req, err := http.NewRequest("GET", "/health", nil)
+	assert.NoError(t, err)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 
 	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 
 	// Verify all expected fields are present
