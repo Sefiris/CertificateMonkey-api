@@ -1,0 +1,235 @@
+name: Release Helm Chart
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'helm/**'
+      - 'VERSION'
+      - '.github/workflows/helm-release.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  HELM_VERSION: '3.13.0'
+
+jobs:
+  lint-test:
+    name: Lint and Test Helm Chart
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: ${{ env.HELM_VERSION }}
+
+    - name: Lint Helm chart
+      run: |
+        helm lint helm/certificate-monkey
+        echo "✅ Helm lint passed"
+
+    - name: Lint Helm chart with minikube values
+      run: |
+        helm lint helm/certificate-monkey -f helm/certificate-monkey/values-minikube.yaml
+        echo "✅ Helm lint with minikube values passed"
+
+    - name: Template validation
+      run: |
+        helm template test-release helm/certificate-monkey > /dev/null
+        echo "✅ Template rendering succeeded"
+
+        # Test with minikube values
+        helm template test-release helm/certificate-monkey -f helm/certificate-monkey/values-minikube.yaml > /dev/null
+        echo "✅ Template rendering with minikube values succeeded"
+
+  package-publish:
+    name: Package and Publish Helm Chart
+    runs-on: ubuntu-latest
+    needs: lint-test
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout main branch
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: ${{ env.HELM_VERSION }}
+
+    - name: Get version
+      id: version
+      run: |
+        VERSION=$(cat VERSION)
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "📦 Packaging chart version: ${VERSION}"
+
+    - name: Update Chart.yaml with version
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        sed -i "s/^version:.*/version: ${VERSION}/" helm/certificate-monkey/Chart.yaml
+        sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" helm/certificate-monkey/Chart.yaml
+
+        echo "📝 Updated Chart.yaml:"
+        grep -E "^(version|appVersion):" helm/certificate-monkey/Chart.yaml
+
+    - name: Package Helm chart
+      run: |
+        mkdir -p .helm-release
+        helm package helm/certificate-monkey -d .helm-release
+        echo "✅ Chart packaged successfully"
+        ls -lh .helm-release/
+
+    - name: Checkout gh-pages branch
+      uses: actions/checkout@v4
+      with:
+        ref: gh-pages
+        path: gh-pages
+
+    - name: Initialize gh-pages if needed
+      run: |
+        if [ ! -d "gh-pages" ]; then
+          mkdir -p gh-pages
+          cd gh-pages
+          git checkout --orphan gh-pages
+          git rm -rf . || true
+          echo "# Certificate Monkey Helm Repository" > README.md
+          git add README.md
+          git commit -m "Initialize gh-pages branch"
+        fi
+
+    - name: Copy packaged chart to gh-pages
+      run: |
+        cp .helm-release/*.tgz gh-pages/
+        echo "✅ Chart copied to gh-pages"
+        ls -lh gh-pages/
+
+    - name: Generate Helm repository index
+      run: |
+        cd gh-pages
+        helm repo index . --url https://sefiris.github.io/CertificateMonkey/
+        echo "✅ Repository index generated"
+        cat index.yaml
+
+    - name: Create gh-pages README
+      run: |
+        cd gh-pages
+        cat > README.md << 'EOF'
+        # Certificate Monkey Helm Chart Repository
+
+        This repository hosts Helm charts for Certificate Monkey.
+
+        ## Usage
+
+        Add this Helm repository:
+
+        ```bash
+        helm repo add certificate-monkey https://sefiris.github.io/CertificateMonkey/
+        helm repo update
+        ```
+
+        Install the chart:
+
+        ```bash
+        helm install certificate-monkey certificate-monkey/certificate-monkey
+        ```
+
+        ## Available Charts
+
+        - **certificate-monkey**: Secure certificate management API with AWS KMS encryption
+
+        ## Documentation
+
+        - [Installation Guide](https://github.com/dduivenbode/CertificateMonkey/blob/main/docs/HELM_DEPLOYMENT.md)
+        - [Testing Guide](https://github.com/dduivenbode/CertificateMonkey/blob/main/docs/HELM_TESTING.md)
+        - [Main Repository](https://github.com/dduivenbode/CertificateMonkey)
+
+        ## Chart Versions
+
+        See [index.yaml](./index.yaml) for all available versions.
+        EOF
+
+        echo "✅ README.md created"
+
+    - name: Configure Git
+      run: |
+        cd gh-pages
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Commit and push to gh-pages
+      run: |
+        cd gh-pages
+        git add .
+
+        if git diff --staged --quiet; then
+          echo "ℹ️  No changes to commit"
+        else
+          git commit -m "Release Helm chart version ${{ steps.version.outputs.version }}"
+          git push origin gh-pages
+          echo "✅ Changes pushed to gh-pages branch"
+        fi
+
+    - name: Create release notes
+      if: github.event_name == 'release'
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        cat > release-notes.md << EOF
+        ## Helm Chart Release ${VERSION}
+
+        ### Installation
+
+        \`\`\`bash
+        # Add the Helm repository
+        helm repo add certificate-monkey https://sefiris.github.io/CertificateMonkey/
+        helm repo update
+
+        # Install the chart
+        helm install certificate-monkey certificate-monkey/certificate-monkey \\
+          --version ${VERSION} \\
+          --namespace certificate-monkey \\
+          --create-namespace
+        \`\`\`
+
+        ### Documentation
+
+        - [Deployment Guide](https://github.com/dduivenbode/CertificateMonkey/blob/main/docs/HELM_DEPLOYMENT.md)
+        - [Testing Guide](https://github.com/dduivenbode/CertificateMonkey/blob/main/docs/HELM_TESTING.md)
+
+        ### Chart Repository
+
+        https://sefiris.github.io/CertificateMonkey/
+        EOF
+
+        cat release-notes.md
+
+  notify:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: [lint-test, package-publish]
+    if: always()
+
+    steps:
+    - name: Notify success
+      if: needs.package-publish.result == 'success'
+      run: |
+        echo "✅ Helm chart successfully published to gh-pages branch"
+        echo "📦 Repository URL: https://sefiris.github.io/CertificateMonkey/"
+        echo "📚 Add with: helm repo add certificate-monkey https://sefiris.github.io/CertificateMonkey/"
+
+    - name: Notify failure
+      if: needs.package-publish.result == 'failure' || needs.lint-test.result == 'failure'
+      run: |
+        echo "❌ Helm chart release failed"
+        exit 1

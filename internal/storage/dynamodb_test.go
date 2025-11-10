@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -135,4 +136,30 @@ func TestCompareEntitiesDescendingOrder(t *testing.T) {
 	// Test descending order flips the comparison
 	result := storage.compareEntities(entity1, entity2, "common_name", "desc")
 	assert.True(t, result, "Descending order should flip comparison result")
+}
+
+// TestHealthCheckMethodSignatures verifies the health check methods have correct signatures
+func TestHealthCheckMethodSignatures(t *testing.T) {
+	logger := logrus.New()
+	cfg := &config.Config{
+		AWS: config.AWSConfig{
+			DynamoDBTable: "test-table",
+			KMSKeyID:      "test-key",
+		},
+	}
+
+	storage := NewDynamoDBStorage(nil, nil, cfg, logger)
+
+	// Verify storage was created
+	assert.NotNil(t, storage)
+	assert.Equal(t, "test-table", storage.tableName)
+	assert.Equal(t, "test-key", storage.kmsKeyID)
+
+	// Verify health check methods exist by checking they can be referenced
+	// We don't call them because they require real AWS clients
+	var dynamoHealthCheck func(context.Context) error = storage.CheckDynamoDBHealth
+	var kmsHealthCheck func(context.Context) error = storage.CheckKMSHealth
+
+	assert.NotNil(t, dynamoHealthCheck)
+	assert.NotNil(t, kmsHealthCheck)
 }

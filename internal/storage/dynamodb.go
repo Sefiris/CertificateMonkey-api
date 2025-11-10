@@ -573,3 +573,33 @@ func (d *DynamoDBStorage) decryptData(ctx context.Context, encryptedData string)
 
 	return string(result.Plaintext), nil
 }
+
+// CheckDynamoDBHealth verifies DynamoDB table accessibility
+func (d *DynamoDBStorage) CheckDynamoDBHealth(ctx context.Context) error {
+	// Try to describe the table to verify access
+	input := &dynamodb.DescribeTableInput{
+		TableName: aws.String(d.tableName),
+	}
+
+	_, err := d.client.DescribeTable(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to describe DynamoDB table: %w", err)
+	}
+
+	return nil
+}
+
+// CheckKMSHealth verifies KMS key accessibility
+func (d *DynamoDBStorage) CheckKMSHealth(ctx context.Context) error {
+	// Try to describe the key to verify access
+	input := &kms.DescribeKeyInput{
+		KeyId: aws.String(d.kmsKeyID),
+	}
+
+	_, err := d.kmsClient.DescribeKey(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to describe KMS key: %w", err)
+	}
+
+	return nil
+}

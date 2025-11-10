@@ -228,33 +228,113 @@ docker-clean: ## Clean up Docker images and containers
 	@docker rmi certificate-monkey:latest certificate-monkey:$(CURRENT_VERSION) 2>/dev/null || true
 	@echo "✅ Docker cleanup complete"
 
-# Helm commands (future implementation)
-# When Helm charts are created, uncomment and customize these commands:
-#
-# helm-lint: ## Lint Helm chart
-# 	@echo "🔍 Linting Helm chart..."
-# 	@helm lint helm/certificate-monkey
-#
-# helm-package: ## Package Helm chart with current version
-# 	@echo "📦 Packaging Helm chart..."
-# 	@sed -i.bak "s/^appVersion:.*$$/appVersion: \"$(CURRENT_VERSION)\"/" helm/certificate-monkey/Chart.yaml
-# 	@helm package helm/certificate-monkey
-# 	@rm -f helm/certificate-monkey/Chart.yaml.bak
-#
-# helm-install: ## Install chart locally for testing
-# 	@echo "🚀 Installing Helm chart..."
-# 	@helm install certificate-monkey-test ./helm/certificate-monkey \
-# 		--set image.tag=$(CURRENT_VERSION) \
-# 		--set apiKeys.primary=test-key
-#
-# helm-test: ## Run Helm chart tests
-# 	@echo "🧪 Testing Helm chart..."
-# 	@helm test certificate-monkey-test
-#
-# helm-uninstall: ## Uninstall test chart
-# 	@helm uninstall certificate-monkey-test
-#
-# See docs/HELM_INTEGRATION.md for complete Helm integration guide
+# Helm commands
+helm-lint: ## Lint Helm chart
+	@echo "🔍 Linting Helm chart..."
+	@helm lint helm/certificate-monkey
+	@echo "✅ Helm lint passed"
+
+helm-lint-minikube: ## Lint Helm chart with minikube values
+	@echo "🔍 Linting Helm chart with minikube values..."
+	@helm lint helm/certificate-monkey -f helm/certificate-monkey/values-minikube.yaml
+	@echo "✅ Helm lint with minikube values passed"
+
+helm-template: ## Test template rendering
+	@echo "📝 Testing Helm template rendering..."
+	@helm template test-release helm/certificate-monkey > /tmp/certificate-monkey-template.yaml
+	@echo "✅ Template rendered successfully"
+	@echo "📄 Output saved to /tmp/certificate-monkey-template.yaml"
+
+helm-template-minikube: ## Test template rendering with minikube values
+	@echo "📝 Testing Helm template rendering with minikube values..."
+	@helm template test-release helm/certificate-monkey -f helm/certificate-monkey/values-minikube.yaml > /tmp/certificate-monkey-minikube-template.yaml
+	@echo "✅ Template rendered successfully"
+	@echo "📄 Output saved to /tmp/certificate-monkey-minikube-template.yaml"
+
+helm-package: ## Package Helm chart with current version
+	@echo "📦 Packaging Helm chart v$(CURRENT_VERSION)..."
+	@mkdir -p dist
+	@cp helm/certificate-monkey/Chart.yaml helm/certificate-monkey/Chart.yaml.bak
+	@sed -i.tmp "s/^version:.*/version: $(CURRENT_VERSION)/" helm/certificate-monkey/Chart.yaml
+	@sed -i.tmp "s/^appVersion:.*/appVersion: \"$(CURRENT_VERSION)\"/" helm/certificate-monkey/Chart.yaml
+	@helm package helm/certificate-monkey -d dist
+	@mv helm/certificate-monkey/Chart.yaml.bak helm/certificate-monkey/Chart.yaml
+	@rm -f helm/certificate-monkey/Chart.yaml.tmp
+	@echo "✅ Chart packaged: dist/certificate-monkey-$(CURRENT_VERSION).tgz"
+
+helm-install-minikube: ## Install chart in minikube for testing
+	@echo "🚀 Installing Helm chart to minikube..."
+	@kubectl create namespace certificate-monkey || true
+	@echo ""
+	@echo "⚠️  Please create required secrets first:"
+	@echo "   kubectl create secret generic certificate-monkey-api-keys --namespace=certificate-monkey --from-literal=API_KEY_1=test-key-1 --from-literal=API_KEY_2=test-key-2"
+	@echo "   kubectl create secret generic certificate-monkey-aws --namespace=certificate-monkey --from-literal=AWS_ACCESS_KEY_ID=your-key --from-literal=AWS_SECRET_ACCESS_KEY=your-secret"
+	@echo ""
+	@read -p "Press enter to continue or Ctrl+C to cancel..."
+	@helm install certificate-monkey ./helm/certificate-monkey \
+		--namespace=certificate-monkey \
+		--values helm/certificate-monkey/values-minikube.yaml
+	@echo "✅ Chart installed successfully"
+	@echo ""
+	@echo "📋 Check status with:"
+	@echo "   kubectl get pods -n certificate-monkey"
+	@echo "   helm status certificate-monkey -n certificate-monkey"
+
+helm-upgrade-minikube: ## Upgrade chart in minikube
+	@echo "⬆️  Upgrading Helm chart in minikube..."
+	@helm upgrade certificate-monkey ./helm/certificate-monkey \
+		--namespace=certificate-monkey \
+		--values helm/certificate-monkey/values-minikube.yaml
+	@echo "✅ Chart upgraded successfully"
+
+helm-uninstall-minikube: ## Uninstall chart from minikube
+	@echo "🗑️  Uninstalling Helm chart from minikube..."
+	@helm uninstall certificate-monkey --namespace=certificate-monkey
+	@echo "✅ Chart uninstalled"
+	@echo ""
+	@echo "💡 To also delete the namespace and secrets:"
+	@echo "   kubectl delete namespace certificate-monkey"
+
+helm-test-minikube: ## Run complete minikube test workflow
+	@echo "🧪 Running complete Helm chart test in minikube..."
+	@echo ""
+	@echo "1️⃣  Linting chart..."
+	@make helm-lint-minikube
+	@echo ""
+	@echo "2️⃣  Testing template rendering..."
+	@make helm-template-minikube
+	@echo ""
+	@echo "3️⃣  Packaging chart..."
+	@make helm-package
+	@echo ""
+	@echo "✅ All tests passed!"
+	@echo ""
+	@echo "📚 Next steps:"
+	@echo "   1. Ensure minikube is running: minikube start"
+	@echo "   2. Create required secrets (see docs/HELM_TESTING.md)"
+	@echo "   3. Install chart: make helm-install-minikube"
+	@echo "   4. Test application functionality"
+	@echo "   5. Clean up: make helm-uninstall-minikube"
+
+helm-status: ## Show Helm chart status
+	@echo "📊 Helm chart status:"
+	@helm list -n certificate-monkey
+	@echo ""
+	@echo "📦 Pods:"
+	@kubectl get pods -n certificate-monkey
+	@echo ""
+	@echo "🌐 Services:"
+	@kubectl get svc -n certificate-monkey
+
+helm-logs: ## View Helm chart pod logs
+	@echo "📋 Viewing pod logs..."
+	@kubectl logs -l app.kubernetes.io/name=certificate-monkey -n certificate-monkey --tail=50
+
+helm-clean: ## Clean up Helm packaging artifacts
+	@echo "🧹 Cleaning Helm artifacts..."
+	@rm -rf dist/*.tgz
+	@rm -f /tmp/certificate-monkey-*.yaml
+	@echo "✅ Cleanup complete"
 
 # Scripts
 demo: ## Run the complete demo

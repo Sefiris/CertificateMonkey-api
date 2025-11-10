@@ -70,6 +70,49 @@ A secure, scalable API for managing private keys, certificate signing requests (
      certificate-monkey
    ```
 
+### Helm Deployment
+
+Certificate Monkey can be deployed to Kubernetes using Helm charts.
+
+1. **Add the Helm repository**
+   ```bash
+   helm repo add certificate-monkey https://sefiris.github.io/CertificateMonkey/
+   helm repo update
+   ```
+
+2. **Create required secrets**
+   ```bash
+   # Create namespace
+   kubectl create namespace certificate-monkey
+
+   # Create API keys secret
+   kubectl create secret generic certificate-monkey-api-keys \
+     --namespace=certificate-monkey \
+     --from-literal=API_KEY_1=your-primary-key \
+     --from-literal=API_KEY_2=your-secondary-key
+   ```
+
+3. **Install the API chart**
+   ```bash
+   helm install certificate-monkey-api certificate-monkey/certificate-monkey-api \
+     --namespace=certificate-monkey \
+     --set aws.region=us-east-1 \
+     --set aws.dynamodbTable=certificate-monkey \
+     --set aws.kmsKeyId=alias/certificate-monkey
+   ```
+
+📚 **Helm Documentation:**
+- [Deployment Guide](docs/HELM_DEPLOYMENT.md) - Complete production deployment instructions
+- [Testing Guide](docs/HELM_TESTING.md) - Minikube testing and development
+- [Helm Charts](helm/README.md) - Chart documentation and configuration options
+
+**Key Features:**
+- ✅ Multi-replica deployments with horizontal pod autoscaling
+- ✅ IRSA (IAM Roles for Service Accounts) support for secure AWS authentication
+- ✅ Ingress and TLS configuration
+- ✅ Health checks and monitoring integration
+- ✅ Production-ready security defaults
+
 ## API Documentation
 
 ### Authentication
@@ -89,6 +132,37 @@ curl -H "Authorization: Bearer your_api_key_here" http://localhost:8080/api/v1/k
 #### Health Check
 ```
 GET /health
+```
+
+Returns basic service health status.
+
+#### AWS Health Check
+```
+GET /health/aws
+```
+
+Returns detailed health status for AWS services (DynamoDB and KMS connectivity).
+
+Example response:
+```json
+{
+  "status": "healthy",
+  "service": "certificate-monkey",
+  "version": "0.1.0",
+  "timestamp": "2025-11-09T17:30:00Z",
+  "checks": {
+    "dynamodb": {
+      "status": "healthy",
+      "message": "DynamoDB table is accessible",
+      "response_ms": 45
+    },
+    "kms": {
+      "status": "healthy",
+      "message": "KMS key is accessible",
+      "response_ms": 32
+    }
+  }
+}
 ```
 
 #### Build Information
