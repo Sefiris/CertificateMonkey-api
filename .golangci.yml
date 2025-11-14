@@ -1,4 +1,6 @@
 # golangci-lint configuration
+version: "1"
+
 run:
   timeout: 5m
 
@@ -11,27 +13,3 @@ linters:
     - unused
     - gofmt
     - goimports
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-
-  govet:
-    enable-all: true
-    disable:
-      - shadow
-      - fieldalignment
-
-  gocyclo:
-    min-complexity: 15
-
-  gosec:
-    excludes:
-      - G101
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
